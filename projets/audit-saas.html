@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Audit de sécurité d'un SaaS par pentesting — Hippolyte Njotong Tchapda</title>
+<meta name="description" content="Étude de cas : audit de sécurité applicatif d'une plateforme SaaS par test d'intrusion. Méthodologie, constats classés par risque, remédiations et feuille de route DevSecOps." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ===== Tokens (identiques au portfolio) ===== */
+:root{--bg:#060708;--fg:#f5f6f7;--fg-soft:#c9ccd2;--muted:#80848d;--line:rgba(255,255,255,.08);--line-strong:rgba(255,255,255,.16);--glass:rgba(255,255,255,.035);--glass-strong:rgba(255,255,255,.06);--glow:rgba(255,255,255,.14);--ok:#7dffb3;
+--crit:#ff5c6c;--high:#ff9f43;--med:#ffd166;--low:#7dd3fc;
+--font:"Geist",ui-sans-serif,system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace;--ease:cubic-bezier(.22,1,.36,1);--r:20px;--wrap:min(1180px,100% - 2.5rem)}
+[data-theme="light"]{--bg:#f5f5f2;--fg:#0b0c0e;--fg-soft:#2b2e33;--muted:#62666e;--line:rgba(0,0,0,.08);--line-strong:rgba(0,0,0,.16);--glass:rgba(255,255,255,.55);--glass-strong:rgba(255,255,255,.85);--glow:rgba(0,0,0,.08);--ok:#0a9a55;--crit:#d62839;--high:#e07a00;--med:#b88a00;--low:#0284c7}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);line-height:1.65;-webkit-font-smoothing:antialiased;transition:background .5s,color .5s}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--fg);color:var(--bg)}
+.wrap{width:var(--wrap);margin-inline:auto}
+.mono{font-family:var(--mono)}
+code{font-family:var(--mono);font-size:.88em;padding:2px 6px;border-radius:6px;background:var(--glass-strong);border:1px solid var(--line)}
+
+/* ===== Barre haute ===== */
+.progress{position:fixed;top:0;left:0;height:2px;width:100%;transform-origin:0 50%;transform:scaleX(0);background:var(--fg);z-index:60}
+.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);background:color-mix(in srgb,var(--bg) 70%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
+.back{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--fg-soft)}
+.back:hover{color:var(--fg)}
+.back svg{width:16px;height:16px;transition:transform .4s var(--ease)}
+.back:hover svg{transform:translateX(-3px)}
+.icon-btn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--glass);cursor:pointer;color:inherit}
+.icon-btn svg{width:16px;height:16px}
+
+/* ===== Hero ===== */
+.hero{padding:clamp(70px,11vw,140px) 0 60px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;width:900px;height:900px;left:60%;top:-30%;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 60%);filter:blur(30px);pointer-events:none}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.kicker .tag{padding:4px 10px;border:1px solid var(--line-strong);border-radius:999px;letter-spacing:.1em}
+h1{font-size:clamp(2.4rem,6.6vw,5.6rem);font-weight:600;letter-spacing:-.045em;line-height:.98;margin:26px 0 22px;max-width:15ch}
+h1 em{font-style:normal;font-weight:300;color:var(--muted)}
+.lede{font-size:clamp(1.05rem,1.8vw,1.3rem);color:var(--fg-soft);max-width:60ch}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:56px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--line)}
+.meta div{background:var(--bg);padding:22px}
+.meta dt{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.meta dd{margin-top:8px;font-size:15px}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:13px 22px;border-radius:999px;font-size:14px;font-weight:500;border:1px solid var(--line-strong);background:var(--glass);transition:transform .4s var(--ease),box-shadow .4s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 0 0 5px var(--glow)}
+.btn-primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn svg{width:15px;height:15px}
+
+/* ===== Layout avec sommaire ===== */
+.layout{display:grid;grid-template-columns:220px 1fr;gap:clamp(30px,5vw,80px);padding-bottom:120px}
+.toc{position:sticky;top:96px;align-self:start;font-size:14px}
+.toc p{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--muted);margin-bottom:14px}
+.toc a{display:flex;gap:10px;padding:7px 0 7px 14px;border-left:1px solid var(--line);color:var(--muted);transition:color .3s,border-color .3s}
+.toc a span{font-family:var(--mono);font-size:11px;opacity:.6;padding-top:2px}
+.toc a:hover,.toc a.active{color:var(--fg);border-color:var(--fg)}
+section{padding-top:80px;scroll-margin-top:70px}
+.sec-num{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--muted)}
+h2{font-size:clamp(1.8rem,3.6vw,2.8rem);font-weight:600;letter-spacing:-.035em;line-height:1.08;margin:10px 0 22px}
+h2 em{font-style:normal;font-weight:300;color:var(--muted)}
+h3{font-size:1.2rem;font-weight:500;letter-spacing:-.015em;margin-bottom:8px}
+p{color:var(--fg-soft);max-width:72ch}
+p+p{margin-top:1em}
+.card{border:1px solid var(--line);background:var(--glass);border-radius:var(--r);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;overflow:hidden;transition:border-color .4s,transform .5s var(--ease)}
+.card::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .4s;background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),var(--glow),transparent 45%)}
+.card:hover{border-color:var(--line-strong)}
+.card:hover::before{opacity:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
+.pad{padding:24px}
+.small{font-size:.93rem;color:var(--muted)}
+.callout{margin-top:28px;padding:22px 24px;border-left:2px solid var(--fg);background:var(--glass);border-radius:0 14px 14px 0}
+.callout p{color:var(--fg)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.kpi{padding:22px}
+.kpi b{display:block;font-size:2.4rem;font-weight:600;letter-spacing:-.04em;line-height:1}
+.kpi span{font-size:13px;color:var(--muted)}
+
+/* Phases */
+.phases{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:30px;position:relative}
+.phase{padding:22px 20px 22px 0;border-top:1px solid var(--line-strong);position:relative}
+.phase::before{content:"";position:absolute;top:-5px;left:0;width:9px;height:9px;border-radius:50%;background:var(--fg);box-shadow:0 0 0 5px var(--glow)}
+.phase .n{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.15em}
+.phase h3{margin-top:8px}
+
+/* Gantt */
+.gantt{margin-top:28px;padding:24px}
+.g-row{display:grid;grid-template-columns:180px 1fr;align-items:center;gap:14px;padding:7px 0;font-size:14px}
+.g-track{position:relative;height:22px;background:var(--glass);border-radius:6px;border:1px solid var(--line)}
+.g-bar{position:absolute;top:3px;bottom:3px;border-radius:4px;background:var(--fg);opacity:.85;transform-origin:left;transform:scaleX(0);transition:transform 1.2s var(--ease)}
+.gantt.in .g-bar{transform:scaleX(1)}
+.g-bar.alt{opacity:.45}
+.g-scale{display:grid;grid-template-columns:180px 1fr;gap:14px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px}
+.g-scale div:last-child{display:flex;justify-content:space-between}
+
+/* Tableau */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400}
+tr:last-child td{border-bottom:0}
+.tbl{margin-top:28px;overflow-x:auto}
+.sev{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.sev::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.s-crit{color:var(--crit)}.s-high{color:var(--high)}.s-med{color:var(--med)}.s-low{color:var(--low)}
+
+/* Distribution du risque */
+.dist{display:flex;height:14px;border-radius:999px;overflow:hidden;margin-top:24px;gap:3px}
+.dist i{display:block;height:100%;transform-origin:left;transform:scaleX(0);transition:transform 1.2s var(--ease)}
+.dist.in i{transform:scaleX(1)}
+.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:14px}
+
+/* Constats (accordéon) */
+.finding{margin-top:14px}
+.finding summary{list-style:none;cursor:pointer;padding:22px 24px;display:grid;grid-template-columns:auto 1fr auto auto;gap:18px;align-items:center}
+.finding summary::-webkit-details-marker{display:none}
+.f-id{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.f-title{font-weight:500;font-size:1.08rem;letter-spacing:-.01em}
+.cvss{font-family:var(--mono);font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-strong)}
+.chev{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;transition:transform .4s var(--ease)}
+.chev svg{width:14px;height:14px}
+.finding[open] .chev{transform:rotate(45deg)}
+.f-body{padding:0 24px 26px;display:grid;grid-template-columns:1fr 1fr;gap:26px;border-top:1px solid var(--line);padding-top:22px}
+.f-body h4{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-bottom:8px}
+.f-body p{font-size:.95rem}
+.f-body ul{padding-left:18px;color:var(--fg-soft);font-size:.95rem}
+.f-body li+li{margin-top:4px}
+.f-full{grid-column:1/-1}
+.refs{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+.chip{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--glass);color:var(--fg-soft)}
+
+/* Code sécurisé */
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:18px 20px;border-radius:14px;background:#0a0b0d;color:#d9dbe0;border:1px solid rgba(255,255,255,.08);overflow-x:auto;margin-top:6px}
+pre .c{color:#7a7f89}pre .k{color:#fff;font-weight:500}pre .s{color:#7dffb3}
+.diff-bad{color:#ff8a95}.diff-good{color:#7dffb3}
+
+/* Matrice de priorisation */
+.matrix{display:grid;grid-template-columns:110px repeat(3,1fr);gap:6px;margin-top:28px;font-size:13px}
+.matrix .h{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:8px}
+.matrix .cell{padding:14px;border-radius:12px;border:1px solid var(--line);min-height:70px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.matrix .p1{background:color-mix(in srgb,var(--crit) 16%,transparent);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
+.matrix .p2{background:color-mix(in srgb,var(--high) 12%,transparent);border-color:color-mix(in srgb,var(--high) 35%,transparent)}
+.matrix .p3{background:var(--glass)}
+.matrix b{font-family:var(--mono);font-size:11px;letter-spacing:.08em}
+
+/* Pipeline DevSecOps */
+.pipeline{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:30px}
+.stage{padding:18px 16px;text-align:left;position:relative}
+.stage .n{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.stage h3{font-size:1rem;margin:10px 0 6px}
+.stage p{font-size:.85rem;color:var(--muted)}
+.stage .flow{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden}
+.stage .flow i{display:block;width:40%;height:100%;background:var(--fg);animation:flow 2.4s linear infinite;animation-delay:calc(var(--i)*.4s);opacity:.7}
+@keyframes flow{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
+
+/* Reveal */
+[data-reveal]{opacity:0;transform:translateY(30px);transition:opacity .9s var(--ease),transform 1s var(--ease)}
+[data-reveal].in{opacity:1;transform:none}
+
+footer{border-top:1px solid var(--line);padding:30px 0 40px;font-size:13px;color:var(--muted)}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+footer a:hover{color:var(--fg)}
+
+@media (max-width:980px){.layout{grid-template-columns:1fr}.toc{display:none}.meta,.kpis{grid-template-columns:repeat(2,1fr)}.pipeline{grid-template-columns:repeat(3,1fr)}.phases{grid-template-columns:repeat(2,1fr);row-gap:20px}}
+@media (max-width:640px){.grid2,.grid3,.f-body{grid-template-columns:1fr}.pipeline{grid-template-columns:repeat(2,1fr)}.finding summary{grid-template-columns:1fr auto;}.finding summary .f-id,.finding summary .cvss{display:none}.g-row,.g-scale{grid-template-columns:110px 1fr}.matrix{grid-template-columns:70px repeat(3,1fr);font-size:11.5px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}[data-reveal]{opacity:1;transform:none}.g-bar,.dist i{transform:none}}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="top">
+  <div class="wrap">
+    <a class="back" href="../#projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Retour au portfolio</a>
+    <span class="mono small">[HNT] / projets / audit-saas</span>
+    <button class="icon-btn" id="themeBtn" aria-label="Changer de thème"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></button>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<section class="hero" style="padding-top:clamp(70px,11vw,140px)">
+  <div class="wrap">
+    <div class="kicker" data-reveal><span class="tag">Projet phare</span> Mémoire de master · Pentest applicatif · 2024</div>
+    <h1 data-reveal>Audit de sécurité d'un SaaS <em>par test d'intrusion.</em></h1>
+    <p class="lede" data-reveal>Une ESN constatait que ses scans de vulnérabilités automatiques ne suffisaient pas : beaucoup de faux positifs et des failles réelles qui passaient inaperçues. J'ai conçu et mené un audit par test d'intrusion de la couche applicative d'un SaaS, de la planification au rapport final. Résultat : 5 vulnérabilités confirmées, dont 2 critiques, avec un plan de remédiation priorisé.</p>
+    <div class="cta-row" data-reveal>
+      <a class="btn btn-primary" href="#constats">Voir les constats <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
+      <a class="btn" href="https://github.com/hippolyte2023/Saas-pentest-" target="_blank" rel="noopener">Dépôt GitHub ↗</a>
+    </div>
+    <dl class="meta" data-reveal>
+      <div><dt>Rôle</dt><dd>Auditeur sécurité · chef de projet</dd></div>
+      <div><dt>Période</dt><dd>Sept. → Nov. 2024 (≈ 2 mois)</dd></div>
+      <div><dt>Approche</dt><dd>Boîte grise · couche applicative</dd></div>
+      <div><dt>Outils</dt><dd>Kali Linux · Burp Suite Pro · Postman</dd></div>
+    </dl>
+  </div>
+</section>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="Sommaire">
+    <p>SOMMAIRE</p>
+    <a href="#contexte"><span>01</span>Contexte</a>
+    <a href="#cadrage"><span>02</span>Cadrage</a>
+    <a href="#methodo"><span>03</span>Méthodologie</a>
+    <a href="#resultats"><span>04</span>Résultats</a>
+    <a href="#constats"><span>05</span>Constats</a>
+    <a href="#priorisation"><span>06</span>Priorisation</a>
+    <a href="#devsecops"><span>07</span>DevSecOps</a>
+    <a href="#bilan"><span>08</span>Bilan</a>
+  </nav>
+
+  <article>
+    <!-- 01 CONTEXTE -->
+    <section id="contexte" style="padding-top:20px">
+      <div class="sec-num">01 — CONTEXTE</div>
+      <h2 data-reveal>Le scan ne suffit pas. <em>Il faut prouver l'exploitabilité.</em></h2>
+      <p data-reveal>ITEC SARL, une société de services et d'ingénierie logicielle, voulait sécuriser les applications SaaS qu'elle proposait à ses clients. Son processus reposait sur un <strong>scanner de vulnérabilités (Nessus)</strong> lancé une fois l'application terminée. Il listait des faiblesses potentielles, mais sans dire lesquelles étaient réellement exploitables.</p>
+      <p data-reveal>Conséquence : les développeurs passaient des heures à corriger de <strong>faux positifs</strong>, tandis que des failles logiques, comme l'autorisation ou le contrôle d'accès, que les scanners détectent mal, restaient en production.</p>
+      <div class="callout" data-reveal><p><strong>Question de recherche :</strong> comment mener un test d'intrusion qui garantisse la fiabilité d'une application SaaS avant sa mise en production, et comment industrialiser cette démarche ?</p></div>
+      <div class="grid3">
+        <div class="card pad" data-reveal><h3>Problème</h3><p class="small">Audit limité à un scan automatique : des vulnérabilités listées mais non qualifiées.</p></div>
+        <div class="card pad" data-reveal><h3>Contrainte</h3><p class="small">Confidentialité oblige, les tests ont été rejoués sur <strong>OWASP Juice Shop</strong>, une application de référence volontairement vulnérable et représentative d'un SaaS moderne (Node.js, API REST, SPA).</p></div>
+        <div class="card pad" data-reveal><h3>Objectif</h3><p class="small">Identifier, confirmer et classer les vulnérabilités, puis livrer un rapport actionnable avec ses correctifs.</p></div>
+      </div>
+    </section>
+
+    <!-- 02 CADRAGE -->
+    <section id="cadrage">
+      <div class="sec-num">02 — CADRAGE</div>
+      <h2 data-reveal>Un projet piloté <em>comme une vraie mission d'audit.</em></h2>
+      <p data-reveal>J'ai rédigé le cahier des charges, découpé la mission en phases, estimé l'effort en jours-personnes et budgété le projet, en suivant les bonnes pratiques de la norme ISO/CEI 27002.</p>
+      <div class="kpis">
+        <div class="card kpi" data-reveal><b>40</b><span>jours-personnes</span></div>
+        <div class="card kpi" data-reveal><b>3</b><span>intervenants</span></div>
+        <div class="card kpi" data-reveal><b>5</b><span>phases de mission</span></div>
+        <div class="card kpi" data-reveal><b>2,5 M</b><span>FCFA de budget estimé</span></div>
+      </div>
+
+      <div class="card gantt" id="gantt" data-reveal>
+        <h3>Planning de la mission</h3>
+        <div id="ganttRows"></div>
+        <div class="g-scale"><div></div><div><span>03 sept.</span><span>01 oct.</span><span>05 nov. 2024</span></div></div>
+      </div>
+
+      <div class="grid3">
+        <div class="card pad" data-reveal><h3>Livrable 1</h3><p class="small">Rapport des actions de lancement : périmètre, contacts, règles d'engagement.</p></div>
+        <div class="card pad" data-reveal><h3>Livrable 2</h3><p class="small">Rapport d'audit technique : constats, preuves, scores et correctifs.</p></div>
+        <div class="card pad" data-reveal><h3>Livrable 3</h3><p class="small">Note de synthèse pour la direction générale : risque global et orientations stratégiques.</p></div>
+      </div>
+    </section>
+
+    <!-- 03 METHODO -->
+    <section id="methodo">
+      <div class="sec-num">03 — MÉTHODOLOGIE</div>
+      <h2 data-reveal>Une démarche structurée, <em>de la carte au rapport.</em></h2>
+      <p data-reveal>Le test a été mené en <strong>boîte grise</strong> : comptes de test fournis, mais pas d'accès au code source. La reconnaissance initiale n'était donc pas nécessaire, et l'effort a porté sur la cartographie, la découverte et la qualification des failles.</p>
+      <div class="phases">
+        <div class="phase" data-reveal><span class="n">PHASE 1</span><h3>Planification</h3><p class="small">Mise en place d'un lab isolé, configuration du proxy d'interception, définition du périmètre.</p></div>
+        <div class="phase" data-reveal><span class="n">PHASE 2</span><h3>Cartographie</h3><p class="small">Parcours de chaque fonctionnalité avec chaque rôle : formulaires, API, profils, flux de commande.</p></div>
+        <div class="phase" data-reveal><span class="n">PHASE 3</span><h3>Découverte &amp; validation</h3><p class="small">Tests ciblés sur les catégories de l'OWASP Top 10, puis confirmation manuelle de chaque faille pour écarter les faux positifs.</p></div>
+        <div class="phase" data-reveal><span class="n">PHASE 4</span><h3>Rapport</h3><p class="small">Scores, mapping aux référentiels, recommandations et restitution aux équipes.</p></div>
+      </div>
+      <div class="grid2">
+        <div class="card pad" data-reveal>
+          <h3>Périmètre de test</h3>
+          <div class="refs" style="margin-top:12px">
+            <span class="chip">Contournement d'autorisation</span><span class="chip">Manipulation de JWT</span><span class="chip">CORS</span><span class="chip">CSRF</span><span class="chip">SSRF</span><span class="chip">Injections (SQLi, XSS)</span><span class="chip">Fuzzing d'en-têtes HTTP</span><span class="chip">Désynchronisation HTTP</span><span class="chip">Empoisonnement de cache</span><span class="chip">Analyse JS côté client</span><span class="chip">Contrôles mal configurés</span>
+          </div>
+        </div>
+        <div class="card pad" data-reveal>
+          <h3>Règles d'engagement</h3>
+          <ul class="small" style="padding-left:18px;margin-top:10px">
+            <li>Environnement de test isolé, jamais la production.</li>
+            <li>Escalade immédiate au client pour tout constat critique.</li>
+            <li>Réunion d'urgence avec l'équipe technique avant de poursuivre les tests.</li>
+            <li>Contre-test prévu une fois les correctifs appliqués.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 04 RESULTATS -->
+    <section id="resultats">
+      <div class="sec-num">04 — RÉSULTATS</div>
+      <h2 data-reveal>Risque global : <em style="color:var(--crit);font-weight:500">très élevé.</em></h2>
+      <p data-reveal>Cinq vulnérabilités confirmées et exploitables. Les deux plus graves pouvaient être <strong>enchaînées</strong> : un attaquant non authentifié pouvait obtenir les privilèges administrateur, puis accéder aux données de tous les utilisateurs.</p>
+      <div class="card pad" style="margin-top:28px" data-reveal>
+        <div class="dist" id="dist">
+          <i style="flex:2;background:var(--crit)"></i><i style="flex:1;background:var(--high)"></i><i style="flex:1;background:var(--med)"></i><i style="flex:1;background:var(--low)"></i>
+        </div>
+        <div class="legend">
+          <span class="sev s-crit">2 critiques</span><span class="sev s-high">1 élevée</span><span class="sev s-med">1 moyenne</span><span class="sev s-low">1 faible</span>
+        </div>
+      </div>
+      <div class="card tbl" data-reveal>
+        <table>
+          <thead><tr><th>#</th><th>Constat</th><th>OWASP 2021</th><th>NIST 800-53</th><th>CVSS 3.1*</th><th>Risque</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">V-01</td><td>Injection SQL sur l'authentification</td><td>A03 Injection</td><td>SI-10</td><td class="mono">9.8</td><td><span class="sev s-crit">Critique</span></td></tr>
+            <tr><td class="mono">V-02</td><td>Contournement d'autorisation via l'API</td><td>A01 Broken Access Control</td><td>AC-3, AC-6</td><td class="mono">9.1</td><td><span class="sev s-crit">Critique</span></td></tr>
+            <tr><td class="mono">V-03</td><td>Cross-Site Scripting (XSS)</td><td>A03 Injection</td><td>SI-10, SC-18</td><td class="mono">6.1</td><td><span class="sev s-high">Élevé</span></td></tr>
+            <tr><td class="mono">V-04</td><td>Stockage des mots de passe inadéquat</td><td>A02 Cryptographic Failures</td><td>IA-5, SC-28</td><td class="mono">5.9</td><td><span class="sev s-med">Moyen</span></td></tr>
+            <tr><td class="mono">V-05</td><td>Politique de mots de passe faible</td><td>A07 Identification &amp; Auth. Failures</td><td>IA-5(1), AC-7</td><td class="mono">4.8</td><td><span class="sev s-low">Faible</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin-top:12px">* Scores CVSS de base estimés. Le niveau de risque final tient compte du contexte métier : la XSS est rehaussée à « élevé » parce que le jeton de session est accessible au JavaScript.</p>
+    </section>
+
+    <!-- 05 CONSTATS -->
+    <section id="constats">
+      <div class="sec-num">05 — CONSTATS &amp; REMÉDIATIONS</div>
+      <h2 data-reveal>Chaque faille, <em>sa cause et son correctif.</em></h2>
+      <p data-reveal>Ce rapport public ne contient volontairement ni charges d'attaque ni preuves d'exploitation. Le rapport complet a été remis au client, comme l'exige la déontologie de l'audit.</p>
+
+      <details class="card finding" data-reveal open>
+        <summary><span class="f-id">V-01</span><span class="f-title">Injection SQL sur le formulaire de connexion</span><span class="cvss">CVSS 9.8</span><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <div class="f-body">
+          <div><h4>Constat</h4><p>Le champ e-mail était concaténé directement dans la requête SQL. Une entrée malformée permettait de rendre la condition d'authentification toujours vraie, et donc de se connecter sans mot de passe en tant que premier compte de la base : l'administrateur.</p></div>
+          <div><h4>Impact</h4><ul><li>Prise de contrôle du compte administrateur sans authentification</li><li>Accès aux autres comptes utilisateurs</li><li>Point d'entrée vers la fuite de la table des utilisateurs (V-04)</li></ul></div>
+          <div class="f-full"><h4>Correctif recommandé : requêtes paramétrées</h4>
+<pre><span class="c">// ❌ Avant : la saisie de l'utilisateur devient du code SQL</span>
+<span class="diff-bad">db.query(`SELECT * FROM Users WHERE email = '${email}' AND password = '${hash}'`)</span>
+
+<span class="c">// ✅ Après : la saisie reste une donnée, jamais du code</span>
+<span class="diff-good">const user = await User.findOne({ where: { email } })        </span><span class="c">// ORM paramétré</span>
+<span class="diff-good">const ok = user && await argon2.verify(user.passwordHash, password)</span></pre>
+            <p class="small" style="margin-top:10px">À compléter par : messages d'erreur génériques (pas d'erreur SGBD renvoyée au navigateur), compte SQL applicatif à privilèges minimaux, validation des entrées par schéma.</p>
+            <div class="refs"><span class="chip">OWASP SQLi Prevention Cheat Sheet</span><span class="chip">Complexité : modérée</span><span class="chip">Priorité 1 · urgent</span></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card finding" data-reveal>
+        <summary><span class="f-id">V-02</span><span class="f-title">Création de comptes administrateurs via l'API</span><span class="cvss">CVSS 9.1</span><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <div class="f-body">
+          <div><h4>Constat</h4><p>Le point d'inscription de l'API acceptait tous les champs envoyés par le client, y compris le <strong>rôle</strong> (<em>mass assignment</em>). Sans jeton ni cookie, n'importe qui pouvait créer un compte avec des privilèges administrateur. L'interface d'administration était en outre accessible à quiconque connaissait son URL.</p></div>
+          <div><h4>Impact</h4><ul><li>Élévation de privilèges verticale sans authentification</li><li>Accès aux paniers et aux données d'autres clients (IDOR)</li><li>Suppression d'avis clients : atteinte à l'intégrité</li></ul></div>
+          <div class="f-full"><h4>Correctif recommandé : autorisation côté serveur, liste blanche des champs</h4>
+<pre><span class="c">// ✅ Ne jamais faire confiance au client pour le rôle</span>
+<span class="diff-good">const { email, password } = schema.parse(req.body)       </span><span class="c">// liste blanche stricte</span>
+<span class="diff-good">await User.create({ email, passwordHash: await argon2.hash(password), role: 'customer' })</span>
+
+<span class="c">// ✅ Contrôle d'accès centralisé, appliqué à chaque route sensible</span>
+<span class="diff-good">router.use('/admin', requireAuth, requireRole('admin'))</span>
+<span class="diff-good">router.get('/basket/:id', requireAuth, ownsResource('basket'), getBasket)</span></pre>
+            <p class="small" style="margin-top:10px">À compléter par : refus par défaut (<em>deny by default</em>), journalisation et alerte sur les tentatives d'accès aux ressources d'autrui, tests d'autorisation automatisés dans la CI.</p>
+            <div class="refs"><span class="chip">OWASP ASVS V4</span><span class="chip">Complexité : modérée</span><span class="chip">Priorité 1 · urgent</span></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card finding" data-reveal>
+        <summary><span class="f-id">V-03</span><span class="f-title">Cross-Site Scripting (suivi de commande, recherche)</span><span class="cvss">CVSS 6.1</span><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <div class="f-body">
+          <div><h4>Constat</h4><p>Des paramètres saisis par l'utilisateur étaient réinjectés dans la page sans encodage. Un lien piégé pouvait ainsi exécuter du JavaScript dans le navigateur de la victime, dans le contexte de l'application.</p></div>
+          <div><h4>Impact</h4><ul><li>Vol du jeton de session, stocké côté client et lisible par le script</li><li>Actions effectuées à l'insu de la victime</li><li>Hameçonnage crédible depuis le domaine légitime</li></ul></div>
+          <div class="f-full"><h4>Correctif recommandé : défense en profondeur</h4>
+<pre><span class="c">// ✅ 1. Encodage en sortie : laisser le framework échapper, bannir le HTML brut</span>
+<span class="diff-bad">element.innerHTML = query</span>          <span class="c">// ❌</span>
+<span class="diff-good">element.textContent = query</span>        <span class="c">// ✅  (Angular : pas de bypassSecurityTrust*)</span>
+
+<span class="c">// ✅ 2. Content-Security-Policy stricte</span>
+<span class="diff-good">Content-Security-Policy: default-src 'self'; script-src 'self'; frame-src 'none'; object-src 'none'</span>
+
+<span class="c">// ✅ 3. Jeton de session hors de portée du JavaScript</span>
+<span class="diff-good">Set-Cookie: session=…; HttpOnly; Secure; SameSite=Strict</span></pre>
+            <div class="refs"><span class="chip">OWASP XSS Prevention Cheat Sheet</span><span class="chip">Complexité : modérée</span><span class="chip">Priorité 2</span></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card finding" data-reveal>
+        <summary><span class="f-id">V-04</span><span class="f-title">Mots de passe hachés en MD5, sans sel</span><span class="cvss">CVSS 5.9</span><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <div class="f-body">
+          <div><h4>Constat</h4><p>Les mots de passe étaient stockés en <strong>MD5 sans sel</strong> : plusieurs utilisateurs partageaient la même empreinte, signe de mots de passe identiques. MD5 est rapide à calculer, donc très vulnérable aux attaques par dictionnaire et par force brute.</p></div>
+          <div><h4>Impact</h4><ul><li>En cas de fuite (par exemple via V-01), la plupart des mots de passe se retrouvent en clair rapidement</li><li>Risque de réutilisation des identifiants sur d'autres services (<em>credential stuffing</em>)</li></ul></div>
+          <div class="f-full"><h4>Correctif recommandé : un hachage adaptatif</h4>
+<pre><span class="diff-bad">md5(password)</span>                                         <span class="c">// ❌ rapide, sans sel</span>
+<span class="diff-good">await argon2.hash(password, { type: argon2.argon2id })</span>  <span class="c">// ✅ sel unique intégré, coût ajustable</span></pre>
+            <p class="small" style="margin-top:10px">Migration progressive : re-hachage transparent à la prochaine connexion de chaque utilisateur, puis réinitialisation forcée des comptes inactifs.</p>
+            <div class="refs"><span class="chip">OWASP Password Storage Cheat Sheet</span><span class="chip">Complexité : modérée</span><span class="chip">Priorité 2</span></div>
+          </div>
+        </div>
+      </details>
+
+      <details class="card finding" data-reveal>
+        <summary><span class="f-id">V-05</span><span class="f-title">Exigences de complexité des mots de passe insuffisantes</span><span class="cvss">CVSS 4.8</span><span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+        <div class="f-body">
+          <div><h4>Constat</h4><p>L'application acceptait des mots de passe courants, présents dans les dictionnaires publics, y compris pour des comptes à privilèges. Aucun verrouillage ni ralentissement ne protégeait l'authentification contre les tentatives répétées.</p></div>
+          <div><h4>Impact</h4><ul><li>Des comptes devinables par une attaque par dictionnaire</li><li>Aucune détection des attaques par force brute</li></ul></div>
+          <div class="f-full"><h4>Correctif recommandé</h4>
+            <ul><li>Mots de passe de 14 caractères minimum ou phrases de passe (recommandations SANS / NIST SP 800-63B)</li><li>Rejet des mots de passe présents dans les listes de fuites connues</li><li>Limitation du débit et verrouillage progressif après plusieurs échecs</li><li>Journalisation des échecs de connexion, revue quotidienne et alertes</li><li><strong>MFA obligatoire</strong> pour les comptes administrateurs</li></ul>
+            <div class="refs"><span class="chip">NIST SP 800-63B</span><span class="chip">Complexité : facile</span><span class="chip">Priorité 2</span></div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- 06 PRIORISATION -->
+    <section id="priorisation">
+      <div class="sec-num">06 — PRIORISATION</div>
+      <h2 data-reveal>Sévérité × complexité <em>= ordre d'action.</em></h2>
+      <p data-reveal>Chaque constat est évalué selon trois axes : sa <strong>sévérité</strong> (CVSS ajusté au contexte), la <strong>complexité de sa correction</strong> (facile, modérée ou complexe) et la <strong>priorité</strong> qui en découle. Les équipes savent ainsi par où commencer.</p>
+      <div class="matrix" data-reveal>
+        <div class="h"></div><div class="h">Correction facile</div><div class="h">Correction modérée</div><div class="h">Correction complexe</div>
+        <div class="h">Critique</div><div class="cell p1"><b>P1 · URGENT</b></div><div class="cell p1"><b>P1 · URGENT</b><span>V-01 · V-02</span></div><div class="cell p1"><b>P1 · URGENT</b></div>
+        <div class="h">Élevé / moyen</div><div class="cell p2"><b>P2 · STANDARD</b></div><div class="cell p2"><b>P2 · STANDARD</b><span>V-03 · V-04</span></div><div class="cell p3"><b>P3 · PLANIFIÉ</b></div>
+        <div class="h">Faible</div><div class="cell p2"><b>P2 · STANDARD</b><span>V-05</span></div><div class="cell p3"><b>P3 · PLANIFIÉ</b></div><div class="cell p3"><b>P3 · PLANIFIÉ</b></div>
+      </div>
+      <p class="small" style="margin-top:12px">V-05 passe en P2 malgré son risque faible : la correction est facile et elle réduit fortement l'efficacité d'une attaque combinée avec V-04.</p>
+    </section>
+
+    <!-- 07 DEVSECOPS -->
+    <section id="devsecops">
+      <div class="sec-num">07 — PERSPECTIVE DEVSECOPS</div>
+      <h2 data-reveal>Du pentest ponctuel <em>à la sécurité continue.</em></h2>
+      <p data-reveal>Un audit en fin de projet coûte cher : corrections tardives, retards, frustration. Ma recommandation stratégique était d'intégrer la sécurité directement dans la chaîne DevOps existante, pour que chaque livraison soit testée automatiquement.</p>
+      <div class="pipeline">
+        <div class="card stage" data-reveal><span class="n">01</span><h3>Code</h3><p>SAST dans l'IDE (SonarLint) et revue de code sécurisée</p><div class="flow"><i style="--i:0"></i></div></div>
+        <div class="card stage" data-reveal><span class="n">02</span><h3>Commit</h3><p>Détection de secrets et hooks pre-commit</p><div class="flow"><i style="--i:1"></i></div></div>
+        <div class="card stage" data-reveal><span class="n">03</span><h3>Build</h3><p>SAST (Semgrep/Sonar) et analyse des dépendances (SCA)</p><div class="flow"><i style="--i:2"></i></div></div>
+        <div class="card stage" data-reveal><span class="n">04</span><h3>Test</h3><p>DAST automatisé (OWASP ZAP) sur l'environnement de préproduction</p><div class="flow"><i style="--i:3"></i></div></div>
+        <div class="card stage" data-reveal><span class="n">05</span><h3>Release</h3><p>Barrière de qualité : aucune faille critique ou élevée ouverte</p><div class="flow"><i style="--i:4"></i></div></div>
+        <div class="card stage" data-reveal><span class="n">06</span><h3>Run</h3><p>Journalisation, supervision et pentest manuel annuel</p><div class="flow"><i style="--i:5"></i></div></div>
+      </div>
+      <div class="card pad" style="margin-top:14px" data-reveal>
+        <h3>Exemple : barrière de sécurité dans GitHub Actions</h3>
+<pre><span class="k">name:</span> security-gate
+<span class="k">on:</span> [pull_request]
+<span class="k">jobs:</span>
+  <span class="k">sast:</span>
+    <span class="k">runs-on:</span> ubuntu-latest
+    <span class="k">steps:</span>
+      - <span class="k">uses:</span> actions/checkout@v4
+      - <span class="k">uses:</span> returntocorp/semgrep-action@v1          <span class="c"># analyse statique (OWASP Top 10)</span>
+        <span class="k">with:</span> { <span class="k">config:</span> <span class="s">p/owasp-top-ten</span> }
+  <span class="k">dast:</span>
+    <span class="k">needs:</span> sast
+    <span class="k">runs-on:</span> ubuntu-latest
+    <span class="k">steps:</span>
+      - <span class="k">uses:</span> zaproxy/action-baseline@v0.12.0       <span class="c"># analyse dynamique sur la préproduction</span>
+        <span class="k">with:</span> { <span class="k">target:</span> <span class="s">${{ vars.STAGING_URL }}</span>, <span class="k">fail_action:</span> true }</pre>
+      </div>
+    </section>
+
+    <!-- 08 BILAN -->
+    <section id="bilan">
+      <div class="sec-num">08 — BILAN</div>
+      <h2 data-reveal>Ce que ce projet <em>m'a appris.</em></h2>
+      <div class="grid2">
+        <div class="card pad" data-reveal><h3>Pour l'entreprise</h3><ul class="small" style="padding-left:18px;margin-top:8px"><li>Failles critiques détectées et corrigées avant la mise en production</li><li>Fin des corrections inutiles liées aux faux positifs</li><li>Une méthode réutilisable pour les prochaines applications</li><li>Une feuille de route DevSecOps et MFA pour les accès sensibles</li></ul></div>
+        <div class="card pad" data-reveal><h3>Pour moi</h3><ul class="small" style="padding-left:18px;margin-top:8px"><li>Piloter une mission d'audit de bout en bout : cadrage, budget, planning</li><li>Qualifier un risque au-delà d'un score : contexte, enchaînements de failles</li><li>Rédiger pour deux publics : développeurs et direction</li><li>Respecter la déontologie : escalade immédiate et divulgation responsable</li></ul></div>
+      </div>
+      <div class="callout" data-reveal><p><strong>Limite assumée :</strong> l'audit portait sur la couche applicative. Un SaaS comporte aussi des couches d'infrastructure, de réseau et d'identité, et une faiblesse dans l'une peut compromettre les autres. La suite logique serait un audit de la configuration cloud et de la gestion des identités.</p></div>
+      <div class="cta-row" data-reveal>
+        <a class="btn btn-primary" href="../#contact">Discutons de votre sécurité <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="../#projects">Autres projets</a>
+      </div>
+    </section>
+  </article>
+</div>
+
+<footer><div class="wrap"><span>© <span id="y"></span> Hippolyte Njotong Tchapda — Étude de cas issue de mon mémoire de master.</span><a href="../">hippolyte2023.github.io</a></div></footer>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  /* Thème partagé avec le portfolio */
+  try { const t = localStorage.getItem("hnt-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  $("#themeBtn").onclick = () => { const n = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = n; try { localStorage.setItem("hnt-theme", n); } catch {} };
+
+  /* Gantt (dates issues du cahier des charges) */
+  const start = new Date("2024-09-03"), end = new Date("2024-11-05"), span = end - start;
+  const tasks = [
+    ["Préparation", "2024-09-03", "2024-09-11"], ["Audit terrain", "2024-09-12", "2024-09-20"],
+    ["Synthèse pré-audit", "2024-09-23", "2024-09-24"], ["Planification", "2024-09-25", "2024-10-02"],
+    ["Découverte", "2024-10-02", "2024-10-15"], ["Exploitation", "2024-10-15", "2024-10-16"],
+    ["Rapport", "2024-10-21", "2024-11-05"], ["Exécution de l'audit", "2024-09-26", "2024-11-01", true]
+  ];
+  $("#ganttRows").innerHTML = tasks.map(([n, a, b, alt], i) => {
+    const l = (new Date(a) - start) / span * 100, w = Math.max((new Date(b) - new Date(a)) / span * 100, 1.6);
+    return `<div class="g-row"><span>${n}</span><div class="g-track"><span class="g-bar${alt ? " alt" : ""}" style="left:${l}%;width:${w}%;transition-delay:${i * .08}s"></span></div></div>`;
+  }).join("");
+
+  /* Révélation au scroll */
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .12 });
+  $$("[data-reveal], #gantt, #dist").forEach(el => io.observe(el));
+
+  /* Sommaire actif + progression */
+  const links = $$(".toc a");
+  const so = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle("active", a.hash === "#" + e.target.id)); }), { rootMargin: "-40% 0px -55% 0px" });
+  $$("article section[id]").forEach(s => so.observe(s));
+  const bar = $("#progress");
+  addEventListener("scroll", () => { const m = document.documentElement.scrollHeight - innerHeight; bar.style.transform = `scaleX(${m > 0 ? scrollY / m : 0})`; }, { passive: true });
+
+  /* Halo lumineux sur les cartes */
+  $$(".card").forEach(c => c.addEventListener("pointermove", e => { const b = c.getBoundingClientRect(); c.style.setProperty("--mx", e.clientX - b.left + "px"); c.style.setProperty("--my", e.clientY - b.top + "px"); }));
+  $("#y").textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>
