@@ -163,6 +163,20 @@ pre .c{color:#7a7f89}pre .k{color:#fff;font-weight:500}pre .s{color:#7dffb3}
 [data-reveal]{opacity:0;transform:translateY(30px);transition:opacity .9s var(--ease),transform 1s var(--ease)}
 [data-reveal].in{opacity:1;transform:none}
 
+
+/* Figures du mémoire + visionneuse */
+.fig{margin-top:14px;padding:14px;cursor:zoom-in}
+.fig .frame{background:#fff;border-radius:12px;padding:14px;display:grid;place-items:center;min-height:120px;overflow:hidden}
+.fig img{max-width:100%;height:auto;display:block;transition:transform .6s var(--ease)}
+.fig:hover img{transform:scale(1.02)}
+.fig figcaption{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:13px;color:var(--muted)}
+.fig figcaption b{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--fg-soft);font-weight:400;white-space:nowrap}
+.lightbox{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:grid;place-items:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .35s;cursor:zoom-out}
+.lightbox.open{opacity:1;pointer-events:auto}
+.lightbox figure{max-width:min(1100px,100%);text-align:center}
+.lightbox img{max-width:100%;max-height:78vh;background:#fff;border-radius:14px;padding:16px;transform:scale(.96);transition:transform .45s var(--ease)}
+.lightbox.open img{transform:none}
+.lightbox p{color:#d9dbe0;margin:14px auto 0;font-size:14px}
 footer{border-top:1px solid var(--line);padding:30px 0 40px;font-size:13px;color:var(--muted)}
 footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
 footer a:hover{color:var(--fg)}
@@ -248,6 +262,8 @@ footer a:hover{color:var(--fg)}
         <div class="g-scale"><div></div><div><span>03 sept.</span><span>01 oct.</span><span>05 nov. 2024</span></div></div>
       </div>
 
+      <figure class="card fig" data-reveal><div class="frame"><img src="img/gantt-mission.webp" alt="Diagramme de Gantt de la mission d’audit" loading="lazy" /></div><figcaption><span>Diagramme de Gantt original de la mission (sept. → nov. 2024).</span><b>MÉMOIRE · FIG. 5</b></figcaption></figure>
+
       <div class="grid3">
         <div class="card pad" data-reveal><h3>Livrable 1</h3><p class="small">Rapport des actions de lancement : périmètre, contacts, règles d'engagement.</p></div>
         <div class="card pad" data-reveal><h3>Livrable 2</h3><p class="small">Rapport d'audit technique : constats, preuves, scores et correctifs.</p></div>
@@ -265,6 +281,10 @@ footer a:hover{color:var(--fg)}
         <div class="phase" data-reveal><span class="n">PHASE 2</span><h3>Cartographie</h3><p class="small">Parcours de chaque fonctionnalité avec chaque rôle : formulaires, API, profils, flux de commande.</p></div>
         <div class="phase" data-reveal><span class="n">PHASE 3</span><h3>Découverte &amp; validation</h3><p class="small">Tests ciblés sur les catégories de l'OWASP Top 10, puis confirmation manuelle de chaque faille pour écarter les faux positifs.</p></div>
         <div class="phase" data-reveal><span class="n">PHASE 4</span><h3>Rapport</h3><p class="small">Scores, mapping aux référentiels, recommandations et restitution aux équipes.</p></div>
+      </div>
+      <div class="grid2" style="grid-template-columns:1.6fr 1fr;align-items:start">
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/architecture-juice-shop.webp" alt="Architecture de l’application auditée" loading="lazy" /></div><figcaption><span>Cartographie de l’architecture cible : SPA Angular, API Node/Express, ORM Sequelize, SQLite.</span><b>MÉMOIRE · FIG. 7</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/transport-http.webp" alt="Page de connexion servie en HTTP non chiffré" loading="lazy" /></div><figcaption><span>Observation lors de la découverte : page de connexion servie en HTTP, donc identifiants transmis en clair.</span><b>MÉMOIRE · FIG. 6</b></figcaption></figure>
       </div>
       <div class="grid2">
         <div class="card pad" data-reveal>
@@ -298,6 +318,7 @@ footer a:hover{color:var(--fg)}
           <span class="sev s-crit">2 critiques</span><span class="sev s-high">1 élevée</span><span class="sev s-med">1 moyenne</span><span class="sev s-low">1 faible</span>
         </div>
       </div>
+      <figure class="card fig" data-reveal><div class="frame"><img src="img/risque-global.webp" alt="Répartition des vulnérabilités par niveau de risque" loading="lazy" /></div><figcaption><span>Graphique original : nombre de vulnérabilités par niveau de risque.</span><b>MÉMOIRE · FIG. 29</b></figcaption></figure>
       <div class="card tbl" data-reveal>
         <table>
           <thead><tr><th>#</th><th>Constat</th><th>OWASP 2021</th><th>NIST 800-53</th><th>CVSS 3.1*</th><th>Risque</th></tr></thead>
@@ -467,6 +488,7 @@ footer a:hover{color:var(--fg)}
   </article>
 </div>
 
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Figure agrandie"><figure><img alt="" /><p></p></figure></div>
 <footer><div class="wrap"><span>© <span id="y"></span> Hippolyte Njotong Tchapda — Étude de cas issue de mon mémoire de master.</span><a href="../">hippolyte2023.github.io</a></div></footer>
 
 <script>
@@ -502,6 +524,12 @@ footer a:hover{color:var(--fg)}
 
   /* Halo lumineux sur les cartes */
   $$(".card").forEach(c => c.addEventListener("pointermove", e => { const b = c.getBoundingClientRect(); c.style.setProperty("--mx", e.clientX - b.left + "px"); c.style.setProperty("--my", e.clientY - b.top + "px"); }));
+
+  /* Visionneuse d'images */
+  const lbx = $("#lightbox"), lbImg = lbx.querySelector("img"), lbCap = lbx.querySelector("p");
+  $$(".fig").forEach(f => f.addEventListener("click", () => { const i = f.querySelector("img"); lbImg.src = i.src; lbImg.alt = i.alt; lbCap.textContent = f.querySelector("figcaption span").textContent; lbx.classList.add("open"); }));
+  lbx.addEventListener("click", () => lbx.classList.remove("open"));
+  addEventListener("keydown", e => { if (e.key === "Escape") lbx.classList.remove("open"); });
   $("#y").textContent = new Date().getFullYear();
 })();
 </script>
