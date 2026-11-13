@@ -31,6 +31,13 @@ code{font-family:var(--mono);font-size:.88em;padding:2px 6px;border-radius:6px;b
 .back:hover{color:var(--fg)}
 .back svg{width:16px;height:16px;transition:transform .4s var(--ease)}
 .back:hover svg{transform:translateX(-3px)}
+.top-left{display:flex;align-items:center;gap:16px}
+.lang-switch{position:relative;display:inline-flex;padding:3px;border-radius:999px;border:1px solid var(--line);background:var(--glass);font-family:var(--mono);font-size:12px}
+.lang-switch button{position:relative;z-index:1;border:0;background:none;cursor:pointer;padding:6px 11px;border-radius:999px;color:var(--muted);letter-spacing:.08em;transition:color .3s}
+.lang-switch button.on{color:var(--bg)}
+.lang-switch::before{content:"";position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;background:var(--fg);transition:transform .45s var(--ease)}
+.lang-switch:has(button[data-lang-btn="en"].on)::before{transform:translateX(100%)}
+@media (max-width:640px){.top .mono.small{display:none}}
 .icon-btn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--glass);cursor:pointer;color:inherit}
 .icon-btn svg{width:16px;height:16px}
 
@@ -191,7 +198,10 @@ footer a:hover{color:var(--fg)}
 
 <header class="top">
   <div class="wrap">
-    <a class="back" href="../#projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Retour au portfolio</a>
+    <div class="top-left">
+      <div class="lang-switch" role="group" aria-label="Langue / Language"><button type="button" data-lang-btn="fr" aria-pressed="true">FR</button><button type="button" data-lang-btn="en" aria-pressed="false">EN</button></div>
+      <a class="back" href="../#projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Retour au portfolio</a>
+    </div>
     <span class="mono small">[HNT] / projets / audit-saas</span>
     <button class="icon-btn" id="themeBtn" aria-label="Changer de thème"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></button>
   </div>
@@ -491,6 +501,9 @@ footer a:hover{color:var(--fg)}
 <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Figure agrandie"><figure><img alt="" /><p></p></figure></div>
 <footer><div class="wrap"><span>© <span id="y"></span> Hippolyte Njotong Tchapda — Étude de cas issue de mon mémoire de master.</span><a href="../">hippolyte2023.github.io</a></div></footer>
 
+<script src="../i18n/i18n.js"></script>
+<script src="../i18n/audit.js"></script>
+<script>I18N.init(I18N_AUDIT.dict, I18N_AUDIT.meta);</script>
 <script>
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -500,16 +513,18 @@ footer a:hover{color:var(--fg)}
 
   /* Gantt (dates issues du cahier des charges) */
   const start = new Date("2024-09-03"), end = new Date("2024-11-05"), span = end - start;
-  const tasks = [
-    ["Préparation", "2024-09-03", "2024-09-11"], ["Audit terrain", "2024-09-12", "2024-09-20"],
-    ["Synthèse pré-audit", "2024-09-23", "2024-09-24"], ["Planification", "2024-09-25", "2024-10-02"],
-    ["Découverte", "2024-10-02", "2024-10-15"], ["Exploitation", "2024-10-15", "2024-10-16"],
-    ["Rapport", "2024-10-21", "2024-11-05"], ["Exécution de l'audit", "2024-09-26", "2024-11-01", true]
+  const en = () => I18N.lang === "en";
+  const tasks = () => [
+    [en() ? "Preparation" : "Préparation", "2024-09-03", "2024-09-11"], [en() ? "Field audit" : "Audit terrain", "2024-09-12", "2024-09-20"],
+    [en() ? "Pre-audit summary" : "Synthèse pré-audit", "2024-09-23", "2024-09-24"], [en() ? "Planning" : "Planification", "2024-09-25", "2024-10-02"],
+    [en() ? "Discovery" : "Découverte", "2024-10-02", "2024-10-15"], [en() ? "Exploitation" : "Exploitation", "2024-10-15", "2024-10-16"],
+    [en() ? "Reporting" : "Rapport", "2024-10-21", "2024-11-05"], [en() ? "Audit execution" : "Exécution de l'audit", "2024-09-26", "2024-11-01", true]
   ];
-  $("#ganttRows").innerHTML = tasks.map(([n, a, b, alt], i) => {
+  const renderGantt = () => $("#ganttRows").innerHTML = tasks().map(([n, a, b, alt], i) => {
     const l = (new Date(a) - start) / span * 100, w = Math.max((new Date(b) - new Date(a)) / span * 100, 1.6);
     return `<div class="g-row"><span>${n}</span><div class="g-track"><span class="g-bar${alt ? " alt" : ""}" style="left:${l}%;width:${w}%;transition-delay:${i * .08}s"></span></div></div>`;
   }).join("");
+  renderGantt(); document.addEventListener("langchange", renderGantt);
 
   /* Révélation au scroll */
   const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .12 });
@@ -530,7 +545,8 @@ footer a:hover{color:var(--fg)}
   $$(".fig").forEach(f => f.addEventListener("click", () => { const i = f.querySelector("img"); lbImg.src = i.src; lbImg.alt = i.alt; lbCap.textContent = f.querySelector("figcaption span").textContent; lbx.classList.add("open"); }));
   lbx.addEventListener("click", () => lbx.classList.remove("open"));
   addEventListener("keydown", e => { if (e.key === "Escape") lbx.classList.remove("open"); });
-  $("#y").textContent = new Date().getFullYear();
+  const setYear = () => { const y = $("#y"); if (y) y.textContent = new Date().getFullYear(); };
+  setYear(); document.addEventListener("langchange", setYear);
 })();
 </script>
 </body>

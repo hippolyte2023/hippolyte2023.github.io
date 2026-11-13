@@ -144,6 +144,13 @@ body::after {
 [data-theme="light"] .theme-ico-sun { display: block; }
 [data-theme="light"] .theme-ico-moon { display: none; }
 .menu-btn { display: none; }
+.nav-left { display: flex; align-items: center; gap: 14px; }
+/* Sélecteur de langue FR / EN */
+.lang-switch { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); font-family: var(--mono); font-size: 12px; }
+.lang-switch button { position: relative; z-index: 1; border: 0; background: none; cursor: pointer; padding: 6px 11px; border-radius: 999px; color: var(--muted); letter-spacing: .08em; transition: color .3s; }
+.lang-switch button.on { color: var(--bg); }
+.lang-switch::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: var(--fg); transition: transform .45s var(--ease); }
+.lang-switch:has(button[data-lang-btn="en"].on)::before { transform: translateX(100%); }
 
 @media (max-width: 860px) {
   .nav-links {
@@ -464,7 +471,13 @@ footer { border-top: 1px solid var(--line); padding: 34px 0 40px; }
 
 <!-- ============ NAVIGATION ============ -->
 <header class="nav" id="nav">
-  <a href="#top" class="logo" aria-label="Accueil"><b>[</b>HNT<b>]</b></a>
+  <div class="nav-left">
+    <div class="lang-switch" role="group" aria-label="Langue / Language">
+      <button type="button" data-lang-btn="fr" aria-pressed="true">FR</button>
+      <button type="button" data-lang-btn="en" aria-pressed="false">EN</button>
+    </div>
+    <a href="#top" class="logo" aria-label="Accueil"><b>[</b>HNT<b>]</b></a>
+  </div>
   <ul class="nav-links" id="navLinks">
     <li><a href="#about">À propos</a></li>
     <li><a href="#skills">Compétences</a></li>
@@ -788,6 +801,9 @@ footer { border-top: 1px solid var(--line); padding: 34px 0 40px; }
   </div>
 </div>
 
+<script src="i18n/i18n.js"></script>
+<script src="i18n/home.js"></script>
+<script>I18N.init(I18N_HOME.dict, I18N_HOME.meta);</script>
 <script>
 /* =========================================================
    CONFIG — personnalise ici tes liens et ton formulaire
@@ -845,13 +861,15 @@ const CONFIG = {
   $$(".scramble").forEach(el => el.addEventListener("mouseenter", () => { if (!el.busy) { el.busy = true; scramble(el, el.dataset.text, 700).then(() => el.busy = false); } }));
 
   /* ---------- Loader (handshake) ---------- */
+  const T = I18N.t; // T("français", "english")
   const steps = [
     ["> init secure_session --tls1.3", ""],
-    ["> échange de clés X25519", "OK"],
-    ["> vérification du certificat", "VALIDE"],
-    ["> chargement du profil : h.njotong.tchapda", "OK"],
-    ["> analyse des menaces actives", "0 détectée"],
+    [T("> échange de clés X25519", "> X25519 key exchange"), "OK"],
+    [T("> vérification du certificat", "> verifying certificate"), T("VALIDE", "VALID")],
+    [T("> chargement du profil : h.njotong.tchapda", "> loading profile: h.njotong.tchapda"), "OK"],
+    [T("> analyse des menaces actives", "> scanning for active threats"), T("0 détectée", "0 found")],
   ];
+  $("#granted").textContent = T("ACCÈS AUTORISÉ", "ACCESS GRANTED");
   function runLoader() {
     const loader = $("#loader"), lines = $("#loaderLines"), bar = $("#loaderBar"), pct = $("#loaderPct");
     const finish = () => {
@@ -923,8 +941,14 @@ const CONFIG = {
   })();
 
   /* ---------- Marquee ---------- */
-  const words = ["Threat Intelligence", "Défense & SOC", "Gestion du risque", "OSINT", "Cryptographie", "Réponse à incident", "GRC", "Privacy by design"];
-  $("#marquee").innerHTML = [...words, ...words].map(w => `<span>${w}</span>`).join("");
+  const renderMarquee = () => {
+    const words = I18N.lang === "en"
+      ? ["Threat Intelligence", "Defense & SOC", "Risk management", "OSINT", "Cryptography", "Incident response", "GRC", "Privacy by design"]
+      : ["Threat Intelligence", "Défense & SOC", "Gestion du risque", "OSINT", "Cryptographie", "Réponse à incident", "GRC", "Privacy by design"];
+    $("#marquee").innerHTML = [...words, ...words].map(w => `<span>${w}</span>`).join("");
+  };
+  renderMarquee();
+  document.addEventListener("langchange", renderMarquee);
 
   /* ---------- Reveal au scroll ---------- */
   const io = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .15, rootMargin: "0px 0px -8% 0px" });
@@ -1001,20 +1025,25 @@ const CONFIG = {
   const e2ee = $("#e2eeText");
   setInterval(() => { e2ee.textContent = Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 6)).join(" "); }, 900);
 
-  const logLines = [
-    ["V-01", "A03", "<b>CRITIQUE</b> injection SQL · auth", true],
-    ["fix ", "    ", "requêtes paramétrées → <span class='al'>validé</span>"],
-    ["V-02", "A01", "<b>CRITIQUE</b> contournement d'autorisation", true],
-    ["fix ", "    ", "RBAC côté serveur → <span class='al'>validé</span>"],
-    ["V-03", "A03", "<b>ÉLEVÉ</b> XSS réfléchie", true],
-    ["fix ", "    ", "encodage + CSP → <span class='al'>validé</span>"],
-    ["V-04", "A02", "MOYEN · hachage MD5 sans sel"],
-    ["fix ", "    ", "argon2id → <span class='al'>validé</span>"],
-    ["V-05", "A07", "FAIBLE · politique de mots de passe"],
-    ["fix ", "    ", "MFA + verrouillage → <span class='al'>validé</span>"],
-  ];
-  const li = logLines.map(([t, s, m]) => s.trim() ? `<li>${t} [${s}] ${m}</li>` : `<li>&nbsp;&nbsp;↳ ${m}</li>`).join("");
-  $("#logs").innerHTML = li + li;
+  const renderLogs = () => {
+    const en = I18N.lang === "en";
+    const logLines = [
+      ["V-01", "A03", en ? "<b>CRITICAL</b> SQL injection · auth" : "<b>CRITIQUE</b> injection SQL · auth"],
+      ["", "", en ? "parameterized queries → <span class='al'>verified</span>" : "requêtes paramétrées → <span class='al'>validé</span>"],
+      ["V-02", "A01", en ? "<b>CRITICAL</b> authorization bypass" : "<b>CRITIQUE</b> contournement d'autorisation"],
+      ["", "", en ? "server-side RBAC → <span class='al'>verified</span>" : "RBAC côté serveur → <span class='al'>validé</span>"],
+      ["V-03", "A03", en ? "<b>HIGH</b> reflected XSS" : "<b>ÉLEVÉ</b> XSS réfléchie"],
+      ["", "", en ? "encoding + CSP → <span class='al'>verified</span>" : "encodage + CSP → <span class='al'>validé</span>"],
+      ["V-04", "A02", en ? "MEDIUM · unsalted MD5 hashing" : "MOYEN · hachage MD5 sans sel"],
+      ["", "", en ? "argon2id → <span class='al'>verified</span>" : "argon2id → <span class='al'>validé</span>"],
+      ["V-05", "A07", en ? "LOW · password policy" : "FAIBLE · politique de mots de passe"],
+      ["", "", en ? "MFA + lockout → <span class='al'>verified</span>" : "MFA + verrouillage → <span class='al'>validé</span>"],
+    ];
+    const li = logLines.map(([t, c, m]) => t ? `<li>${t} [${c}] ${m}</li>` : `<li>&nbsp;&nbsp;↳ ${m}</li>`).join("");
+    $("#logs").innerHTML = li + li;
+  };
+  renderLogs();
+  document.addEventListener("langchange", renderLogs);
 
   /* ---------- Réseaux sociaux ---------- */
   const icons = {
@@ -1038,11 +1067,11 @@ const CONFIG = {
       const bad = input.required && (!input.value.trim() || (input.type === "email" && !/^\S+@\S+\.\S+$/.test(input.value)));
       f.classList.toggle("err", bad); if (bad) valid = false;
     });
-    if (!valid) { status.className = "form-status"; status.textContent = "› Merci de compléter les champs requis."; return; }
+    if (!valid) { status.className = "form-status"; status.textContent = T("› Merci de compléter les champs requis.", "› Please fill in the required fields."); return; }
 
     // Animation : le message est "chiffré" avant l'envoi
     const msg = $("#f-msg"), original = msg.value;
-    sendLbl.textContent = "Chiffrement…";
+    sendLbl.textContent = T("Chiffrement…", "Encrypting…");
     const toHex = s => [...s].map(ch => ch === " " || ch === "\n" ? ch : ch.charCodeAt(0).toString(16).slice(-2)).join("");
     msg.value = toHex(original).slice(0, original.length * 2);
     await new Promise(r => setTimeout(r, 650));
@@ -1061,15 +1090,15 @@ const CONFIG = {
         const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(payload) });
         const res = await r.json().catch(() => ({}));
         if (!r.ok || String(res.success) !== "true") throw 0;
-        status.className = "form-status ok"; status.textContent = "✓ Message chiffré et envoyé. Merci, je vous réponds très vite.";
+        status.className = "form-status ok"; status.textContent = T("✓ Message chiffré et envoyé. Merci, je vous réponds très vite.", "✓ Message encrypted and sent. Thank you — I'll get back to you shortly.");
         form.reset();
       } catch {
-        status.className = "form-status"; status.textContent = "› L'envoi a échoué. Écrivez-moi directement via LinkedIn ou par courriel.";
+        status.className = "form-status"; status.textContent = T("› L'envoi a échoué. Écrivez-moi directement via LinkedIn ou par courriel.", "› Sending failed. Please reach me directly on LinkedIn or by email.");
       }
     } else {
-      status.className = "form-status"; status.textContent = "› Le formulaire n'est pas encore relié à un service d'envoi : contactez-moi via les liens ci-contre.";
+      status.className = "form-status"; status.textContent = T("› Le formulaire n'est pas encore relié à un service d'envoi : contactez-moi via les liens ci-contre.", "› This form isn't connected to a mail service yet: please use the links nearby.");
     }
-    sendLbl.textContent = "Envoyer";
+    sendLbl.textContent = T("Envoyer", "Send");
   });
 
   /* ---------- Terminal interactif ---------- */
@@ -1077,32 +1106,44 @@ const CONFIG = {
   const print = (html, cls = "") => { const d = document.createElement("div"); if (cls) d.className = cls; d.innerHTML = html; out.appendChild(d); out.scrollTop = out.scrollHeight; };
   const go = id => { closeTerm(); setTimeout(() => document.getElementById(id).scrollIntoView({ behavior: reduce ? "auto" : "smooth" }), 250); };
   const commands = {
-    help: () => print(`<span class="w">Commandes disponibles</span>
+    help: () => print(T(`<span class="w">Commandes disponibles</span>
   <span class="g">whoami</span>      qui suis-je
   <span class="g">about</span>       aller à « À propos »
   <span class="g">skills</span>      lister mes compétences
   <span class="g">projects</span>    voir mes projets
   <span class="g">contact</span>     me contacter
   <span class="g">theme</span>       basculer clair / sombre
+  <span class="g">lang</span>        passer en anglais
   <span class="g">scan</span>        lancer un scan de ce site
   <span class="g">clear</span>       effacer l'écran
-  <span class="g">exit</span>        fermer le terminal`),
-    whoami: () => print(`<span class="w">Hippolyte Njotong Tchapda</span>\nSpécialiste en cybersécurité · Master · Threat Intelligence & GRC`),
+  <span class="g">exit</span>        fermer le terminal`, `<span class="w">Available commands</span>
+  <span class="g">whoami</span>      who am I
+  <span class="g">about</span>       go to “About”
+  <span class="g">skills</span>      list my skills
+  <span class="g">projects</span>    see my projects
+  <span class="g">contact</span>     get in touch
+  <span class="g">theme</span>       toggle light / dark
+  <span class="g">lang</span>        switch to French
+  <span class="g">scan</span>        run a scan of this site
+  <span class="g">clear</span>       clear the screen
+  <span class="g">exit</span>        close the terminal`)),
+    whoami: () => print(`<span class="w">Hippolyte Njotong Tchapda</span>\n` + T("Spécialiste en cybersécurité · Master · Threat Intelligence & GRC", "Cybersecurity specialist · Master's · Threat Intelligence & GRC")),
+    lang: () => { I18N.set(I18N.lang === "en" ? "fr" : "en"); print(T("Langue : <span class=\"g\">français</span>", "Language: <span class=\"g\">English</span>")); },
     skills: () => print($$(".skill h3").map(h => "  ▸ " + h.textContent).join("\n")),
     about: () => go("about"), projects: () => go("projects"), contact: () => go("contact"),
-    theme: () => print(`Thème : <span class="g">${toggleTheme()}</span>`),
+    theme: () => print(T("Thème : ", "Theme: ") + `<span class="g">${toggleTheme()}</span>`),
     scan: async () => {
-      const s = ["Ports exposés … 0", "En-têtes de sécurité … OK", "Scripts tiers inconnus … 0", "Formulaire : aucune donnée stockée … OK"];
+      const s = I18N.lang === "en" ? ["Exposed ports … 0", "Security headers … OK", "Unknown third-party scripts … 0", "Form: no data stored … OK"] : ["Ports exposés … 0", "En-têtes de sécurité … OK", "Scripts tiers inconnus … 0", "Formulaire : aucune donnée stockée … OK"];
       for (const l of s) { await new Promise(r => setTimeout(r, 350)); print(`  ${l}`, "c"); }
-      print(`<span class="g">✓ Aucune vulnérabilité détectée. Bon choix de candidat.</span>`);
+      print(`<span class="g">` + T("✓ Aucune vulnérabilité détectée. Bon choix de candidat.", "✓ No vulnerabilities found. Good choice of candidate.") + `</span>`);
     },
-    sudo: () => print(`<span class="c">Permission refusée. Bien essayé 😉</span>`),
+    sudo: () => print(`<span class="c">` + T("Permission refusée. Bien essayé 😉", "Permission denied. Nice try 😉") + `</span>`),
     clear: () => out.innerHTML = "",
     exit: () => closeTerm(),
   };
   function openTerm() {
     wrap.classList.add("open"); document.body.classList.add("locked");
-    if (!out.children.length) print(`<span class="c">Session sécurisée établie. Tapez</span> <span class="g">help</span> <span class="c">pour commencer.</span>`);
+    if (!out.children.length) print(T(`<span class="c">Session sécurisée établie. Tapez</span> <span class="g">help</span> <span class="c">pour commencer.</span>`, `<span class="c">Secure session established. Type</span> <span class="g">help</span> <span class="c">to get started.</span>`));
     setTimeout(() => input.focus(), 80);
   }
   function closeTerm() { wrap.classList.remove("open"); document.body.classList.remove("locked"); }
@@ -1112,7 +1153,7 @@ const CONFIG = {
     if (!raw) return;
     const cmd = raw.toLowerCase().split(/\s+/)[0];
     print(`<span class="g">❯</span> <span class="w">${raw.replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]))}</span>`);
-    (commands[cmd] || (() => print(`<span class="c">Commande inconnue : ${cmd.replace(/[<>&]/g, "")}. Tapez help.</span>`)))();
+    (commands[cmd] || (() => print(`<span class="c">` + T("Commande inconnue : ", "Unknown command: ") + `${cmd.replace(/[<>&]/g, "")}. ` + T("Tapez help.", "Type help.") + `</span>`)))();
   });
   $("#termFab").addEventListener("click", openTerm);
   $("#termClose").addEventListener("click", closeTerm);
@@ -1123,7 +1164,8 @@ const CONFIG = {
     if (e.key === "Escape") closeTerm();
   });
 
-  $("#year").textContent = new Date().getFullYear();
+  const setYear = () => { const y = $("#year"); if (y) y.textContent = new Date().getFullYear(); };
+  setYear(); document.addEventListener("langchange", setYear);
 })();
 </script>
 </body>
