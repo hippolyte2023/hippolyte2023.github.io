@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Cartographier une surface d'exposition avec Maltego et Shodan — Hippolyte Njotong Tchapda</title>
+<meta name="description" content="Étude de cas OSINT : collecte passive avec Maltego et Shodan, analyse de l'exposition publique de deux organisations (anonymisées), divulgation responsable et recommandations." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ===== Tokens (identiques au portfolio) ===== */
+:root{--bg:#060708;--fg:#f5f6f7;--fg-soft:#c9ccd2;--muted:#80848d;--line:rgba(255,255,255,.08);--line-strong:rgba(255,255,255,.16);--glass:rgba(255,255,255,.035);--glass-strong:rgba(255,255,255,.06);--glow:rgba(255,255,255,.14);--ok:#7dffb3;
+--crit:#ff5c6c;--high:#ff9f43;--med:#ffd166;--low:#7dd3fc;
+--font:"Geist",ui-sans-serif,system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace;--ease:cubic-bezier(.22,1,.36,1);--r:20px;--wrap:min(1180px,100% - 2.5rem)}
+[data-theme="light"]{--bg:#f5f5f2;--fg:#0b0c0e;--fg-soft:#2b2e33;--muted:#62666e;--line:rgba(0,0,0,.08);--line-strong:rgba(0,0,0,.16);--glass:rgba(255,255,255,.55);--glass-strong:rgba(255,255,255,.85);--glow:rgba(0,0,0,.08);--ok:#0a9a55;--crit:#d62839;--high:#e07a00;--med:#b88a00;--low:#0284c7}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);line-height:1.65;-webkit-font-smoothing:antialiased;transition:background .5s,color .5s}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--fg);color:var(--bg)}
+.wrap{width:var(--wrap);margin-inline:auto}
+.mono{font-family:var(--mono)}
+code{font-family:var(--mono);font-size:.88em;padding:2px 6px;border-radius:6px;background:var(--glass-strong);border:1px solid var(--line)}
+
+/* ===== Barre haute ===== */
+.progress{position:fixed;top:0;left:0;height:2px;width:100%;transform-origin:0 50%;transform:scaleX(0);background:var(--fg);z-index:60}
+.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);background:color-mix(in srgb,var(--bg) 70%,transparent);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
+.back{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--fg-soft)}
+.back:hover{color:var(--fg)}
+.back svg{width:16px;height:16px;transition:transform .4s var(--ease)}
+.back:hover svg{transform:translateX(-3px)}
+.top-left{display:flex;align-items:center;gap:16px}
+.lang-switch{position:relative;display:inline-flex;padding:3px;border-radius:999px;border:1px solid var(--line);background:var(--glass);font-family:var(--mono);font-size:12px}
+.lang-switch button{position:relative;z-index:1;border:0;background:none;cursor:pointer;padding:6px 11px;border-radius:999px;color:var(--muted);letter-spacing:.08em;transition:color .3s}
+.lang-switch button.on{color:var(--bg)}
+.lang-switch::before{content:"";position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;background:var(--fg);transition:transform .45s var(--ease)}
+.lang-switch:has(button[data-lang-btn="en"].on)::before{transform:translateX(100%)}
+@media (max-width:640px){.top .mono.small{display:none}}
+.icon-btn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:var(--glass);cursor:pointer;color:inherit}
+.icon-btn svg{width:16px;height:16px}
+
+/* ===== Hero ===== */
+.hero{padding:clamp(70px,11vw,140px) 0 60px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;width:900px;height:900px;left:60%;top:-30%;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 60%);filter:blur(30px);pointer-events:none}
+.kicker{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.kicker .tag{padding:4px 10px;border:1px solid var(--line-strong);border-radius:999px;letter-spacing:.1em}
+h1{font-size:clamp(2.4rem,6.6vw,5.6rem);font-weight:600;letter-spacing:-.045em;line-height:.98;margin:26px 0 22px;max-width:15ch}
+h1 em{font-style:normal;font-weight:300;color:var(--muted)}
+.lede{font-size:clamp(1.05rem,1.8vw,1.3rem);color:var(--fg-soft);max-width:60ch}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:56px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--line)}
+.meta div{background:var(--bg);padding:22px}
+.meta dt{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.meta dd{margin-top:8px;font-size:15px}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:13px 22px;border-radius:999px;font-size:14px;font-weight:500;border:1px solid var(--line-strong);background:var(--glass);transition:transform .4s var(--ease),box-shadow .4s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 0 0 5px var(--glow)}
+.btn-primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn svg{width:15px;height:15px}
+
+/* ===== Layout avec sommaire ===== */
+.layout{display:grid;grid-template-columns:220px 1fr;gap:clamp(30px,5vw,80px);padding-bottom:120px}
+.toc{position:sticky;top:96px;align-self:start;font-size:14px}
+.toc p{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--muted);margin-bottom:14px}
+.toc a{display:flex;gap:10px;padding:7px 0 7px 14px;border-left:1px solid var(--line);color:var(--muted);transition:color .3s,border-color .3s}
+.toc a span{font-family:var(--mono);font-size:11px;opacity:.6;padding-top:2px}
+.toc a:hover,.toc a.active{color:var(--fg);border-color:var(--fg)}
+section{padding-top:80px;scroll-margin-top:70px}
+.sec-num{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--muted)}
+h2{font-size:clamp(1.8rem,3.6vw,2.8rem);font-weight:600;letter-spacing:-.035em;line-height:1.08;margin:10px 0 22px}
+h2 em{font-style:normal;font-weight:300;color:var(--muted)}
+h3{font-size:1.2rem;font-weight:500;letter-spacing:-.015em;margin-bottom:8px}
+p{color:var(--fg-soft);max-width:72ch}
+p+p{margin-top:1em}
+.card{border:1px solid var(--line);background:var(--glass);border-radius:var(--r);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;overflow:hidden;transition:border-color .4s,transform .5s var(--ease)}
+.card::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;transition:opacity .4s;background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),var(--glow),transparent 45%)}
+.card:hover{border-color:var(--line-strong)}
+.card:hover::before{opacity:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
+.pad{padding:24px}
+.small{font-size:.93rem;color:var(--muted)}
+.callout{margin-top:28px;padding:22px 24px;border-left:2px solid var(--fg);background:var(--glass);border-radius:0 14px 14px 0}
+.callout p{color:var(--fg)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.kpi{padding:22px}
+.kpi b{display:block;font-size:2.4rem;font-weight:600;letter-spacing:-.04em;line-height:1}
+.kpi span{font-size:13px;color:var(--muted)}
+
+/* Phases */
+.phases{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:30px;position:relative}
+.phase{padding:22px 20px 22px 0;border-top:1px solid var(--line-strong);position:relative}
+.phase::before{content:"";position:absolute;top:-5px;left:0;width:9px;height:9px;border-radius:50%;background:var(--fg);box-shadow:0 0 0 5px var(--glow)}
+.phase .n{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.15em}
+.phase h3{margin-top:8px}
+
+/* Gantt */
+.gantt{margin-top:28px;padding:24px}
+.g-row{display:grid;grid-template-columns:180px 1fr;align-items:center;gap:14px;padding:7px 0;font-size:14px}
+.g-track{position:relative;height:22px;background:var(--glass);border-radius:6px;border:1px solid var(--line)}
+.g-bar{position:absolute;top:3px;bottom:3px;border-radius:4px;background:var(--fg);opacity:.85;transform-origin:left;transform:scaleX(0);transition:transform 1.2s var(--ease)}
+.gantt.in .g-bar{transform:scaleX(1)}
+.g-bar.alt{opacity:.45}
+.g-scale{display:grid;grid-template-columns:180px 1fr;gap:14px;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:10px}
+.g-scale div:last-child{display:flex;justify-content:space-between}
+
+/* Tableau */
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400}
+tr:last-child td{border-bottom:0}
+.tbl{margin-top:28px;overflow-x:auto}
+.sev{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.sev::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.s-crit{color:var(--crit)}.s-high{color:var(--high)}.s-med{color:var(--med)}.s-low{color:var(--low)}
+
+/* Distribution du risque */
+.dist{display:flex;height:14px;border-radius:999px;overflow:hidden;margin-top:24px;gap:3px}
+.dist i{display:block;height:100%;transform-origin:left;transform:scaleX(0);transition:transform 1.2s var(--ease)}
+.dist.in i{transform:scaleX(1)}
+.legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:14px}
+
+/* Constats (accordéon) */
+.finding{margin-top:14px}
+.finding summary{list-style:none;cursor:pointer;padding:22px 24px;display:grid;grid-template-columns:auto 1fr auto auto;gap:18px;align-items:center}
+.finding summary::-webkit-details-marker{display:none}
+.f-id{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.f-title{font-weight:500;font-size:1.08rem;letter-spacing:-.01em}
+.cvss{font-family:var(--mono);font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line-strong)}
+.chev{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;transition:transform .4s var(--ease)}
+.chev svg{width:14px;height:14px}
+.finding[open] .chev{transform:rotate(45deg)}
+.f-body{padding:0 24px 26px;display:grid;grid-template-columns:1fr 1fr;gap:26px;border-top:1px solid var(--line);padding-top:22px}
+.f-body h4{font-family:var(--mono);font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-bottom:8px}
+.f-body p{font-size:.95rem}
+.f-body ul{padding-left:18px;color:var(--fg-soft);font-size:.95rem}
+.f-body li+li{margin-top:4px}
+.f-full{grid-column:1/-1}
+.refs{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+.chip{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--glass);color:var(--fg-soft)}
+
+/* Code sécurisé */
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;padding:18px 20px;border-radius:14px;background:#0a0b0d;color:#d9dbe0;border:1px solid rgba(255,255,255,.08);overflow-x:auto;margin-top:6px}
+pre .c{color:#7a7f89}pre .k{color:#fff;font-weight:500}pre .s{color:#7dffb3}
+.diff-bad{color:#ff8a95}.diff-good{color:#7dffb3}
+
+/* Matrice de priorisation */
+.matrix{display:grid;grid-template-columns:110px repeat(3,1fr);gap:6px;margin-top:28px;font-size:13px}
+.matrix .h{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:8px}
+.matrix .cell{padding:14px;border-radius:12px;border:1px solid var(--line);min-height:70px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.matrix .p1{background:color-mix(in srgb,var(--crit) 16%,transparent);border-color:color-mix(in srgb,var(--crit) 40%,transparent)}
+.matrix .p2{background:color-mix(in srgb,var(--high) 12%,transparent);border-color:color-mix(in srgb,var(--high) 35%,transparent)}
+.matrix .p3{background:var(--glass)}
+.matrix b{font-family:var(--mono);font-size:11px;letter-spacing:.08em}
+
+/* Pipeline DevSecOps */
+.pipeline{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:30px}
+.stage{padding:18px 16px;text-align:left;position:relative}
+.stage .n{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.stage h3{font-size:1rem;margin:10px 0 6px}
+.stage p{font-size:.85rem;color:var(--muted)}
+.stage .flow{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden}
+.stage .flow i{display:block;width:40%;height:100%;background:var(--fg);animation:flow 2.4s linear infinite;animation-delay:calc(var(--i)*.4s);opacity:.7}
+@keyframes flow{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
+
+/* Reveal */
+[data-reveal]{opacity:0;transform:translateY(30px);transition:opacity .9s var(--ease),transform 1s var(--ease)}
+[data-reveal].in{opacity:1;transform:none}
+
+
+/* Figures du mémoire + visionneuse */
+.fig{margin-top:14px;padding:14px;cursor:zoom-in}
+.fig .frame{background:#fff;border-radius:12px;padding:14px;display:grid;place-items:center;min-height:120px;overflow:hidden}
+.fig img{max-width:100%;height:auto;display:block;transition:transform .6s var(--ease)}
+.fig:hover img{transform:scale(1.02)}
+.fig figcaption{display:flex;justify-content:space-between;gap:12px;margin-top:12px;font-size:13px;color:var(--muted)}
+.fig figcaption b{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--fg-soft);font-weight:400;white-space:nowrap}
+.lightbox{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:grid;place-items:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .35s;cursor:zoom-out}
+.lightbox.open{opacity:1;pointer-events:auto}
+.lightbox figure{max-width:min(1100px,100%);text-align:center}
+.lightbox img{max-width:100%;max-height:78vh;background:#fff;border-radius:14px;padding:16px;transform:scale(.96);transition:transform .45s var(--ease)}
+.lightbox.open img{transform:none}
+.lightbox p{color:#d9dbe0;margin:14px auto 0;font-size:14px}
+footer{border-top:1px solid var(--line);padding:30px 0 40px;font-size:13px;color:var(--muted)}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px}
+footer a:hover{color:var(--fg)}
+
+@media (max-width:980px){.layout{grid-template-columns:1fr}.toc{display:none}.meta,.kpis{grid-template-columns:repeat(2,1fr)}.pipeline{grid-template-columns:repeat(3,1fr)}.phases{grid-template-columns:repeat(2,1fr);row-gap:20px}}
+@media (max-width:640px){.grid2,.grid3,.f-body{grid-template-columns:1fr}.pipeline{grid-template-columns:repeat(2,1fr)}.finding summary{grid-template-columns:1fr auto;}.finding summary .f-id,.finding summary .cvss{display:none}.g-row,.g-scale{grid-template-columns:110px 1fr}.matrix{grid-template-columns:70px repeat(3,1fr);font-size:11.5px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}[data-reveal]{opacity:1;transform:none}.g-bar,.dist i{transform:none}}
+
+/* ===== Spécifique OSINT ===== */
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:28px;align-items:stretch}
+.flow .step{padding:18px 16px;position:relative}
+.flow .step .tool{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--muted)}
+.flow .step h3{font-size:1rem;margin:8px 0 6px}
+.flow .step p{font-size:.85rem;color:var(--muted)}
+.flow .step:not(:last-child)::after{content:"→";position:absolute;right:-12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;z-index:2}
+.loop{margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center}
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:28px}
+.gallery .wide{grid-column:1/-1}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.stat{padding:20px}
+.stat b{display:block;font-size:1.9rem;font-weight:600;letter-spacing:-.03em;line-height:1.05}
+.stat code{display:inline-block;margin:8px 0 4px}
+.stat span{font-size:13px;color:var(--muted);display:block}
+.case-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.case{padding:26px}
+.case .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.15em;color:var(--muted)}
+.case h3{font-size:1.3rem;margin:8px 0 10px}
+.case ul{padding-left:18px;color:var(--fg-soft);font-size:.95rem;margin-top:10px}
+.case li+li{margin-top:6px}
+.redact{display:inline-block;background:var(--fg);color:transparent;border-radius:4px;user-select:none;padding:0 .35em;font-family:var(--mono);font-size:.85em}
+.notice{display:flex;gap:14px;align-items:flex-start;margin-top:22px;padding:18px 20px;border:1px dashed var(--line-strong);border-radius:14px}
+.notice svg{width:20px;height:20px;flex:none;margin-top:3px}
+.notice p{font-size:.93rem;margin:0}
+@media (max-width:980px){.flow{grid-template-columns:1fr 1fr}.flow .step::after{display:none}.stat-row{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){.gallery,.case-grid,.flow{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="top">
+  <div class="wrap">
+    <div class="top-left">
+      <div class="lang-switch" role="group" aria-label="Langue / Language"><button type="button" data-lang-btn="fr" aria-pressed="true">FR</button><button type="button" data-lang-btn="en" aria-pressed="false">EN</button></div>
+      <a class="back" href="../#projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Retour au portfolio</a>
+    </div>
+    <span class="mono small">[HNT] / projets / osint</span>
+    <button class="icon-btn" id="themeBtn" aria-label="Changer de thème"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg></button>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<section class="hero" style="padding-top:clamp(70px,11vw,140px)">
+  <div class="wrap">
+    <div class="kicker" data-reveal><span class="tag">Renseignement OSINT</span> CYB6033 · UQO · Automne 2026 · Travail d'équipe</div>
+    <h1 data-reveal>Cartographier une surface d'exposition <em>sans toucher à la cible.</em></h1>
+    <p class="lede" data-reveal>Que peut apprendre n'importe qui sur une organisation à partir de sources publiques ? Avec mon équipe, nous avons maîtrisé deux outils de référence du renseignement en sources ouvertes, Maltego et Shodan, puis nous les avons combinés pour analyser l'exposition réelle de deux organisations. Le tout de façon strictement passive, avec un signalement responsable des risques découverts.</p>
+    <div class="cta-row" data-reveal>
+      <a class="btn btn-primary" href="#cas">Voir l'analyse <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M6 13l6 6 6-6"/></svg></a>
+      <a class="btn" href="#maltego">Les tutoriels</a>
+    </div>
+    <dl class="meta" data-reveal>
+      <div><dt>Rôle</dt><dd>Co-auteur · équipe de 5 analystes</dd></div>
+      <div><dt>Période</dt><dd>Oct. → Nov. 2026</dd></div>
+      <div><dt>Approche</dt><dd>OSINT passif · aucun test actif</dd></div>
+      <div><dt>Outils</dt><dd>Kali Linux · Maltego CE · Shodan</dd></div>
+    </dl>
+  </div>
+</section>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="Sommaire">
+    <p>SOMMAIRE</p>
+    <a href="#cadre"><span>01</span>Cadre</a>
+    <a href="#outils"><span>02</span>Méthode</a>
+    <a href="#maltego"><span>03</span>Maltego</a>
+    <a href="#shodan"><span>04</span>Shodan</a>
+    <a href="#cas"><span>05</span>Analyse</a>
+    <a href="#divulgation"><span>06</span>Divulgation</a>
+    <a href="#defense"><span>07</span>Défense</a>
+    <a href="#bilan"><span>08</span>Bilan</a>
+  </nav>
+
+  <article>
+    <!-- 01 CADRE -->
+    <section id="cadre" style="padding-top:20px">
+      <div class="sec-num">01 — CADRE &amp; ÉTHIQUE</div>
+      <h2 data-reveal>Voir ce qu'un attaquant voit, <em>sans jamais agir comme lui.</em></h2>
+      <p data-reveal>Toute attaque ciblée commence par une phase de reconnaissance. Le but de ce projet était de la reproduire du point de vue du défenseur : identifier ce qu'une organisation laisse visible sur Internet, puis traduire ces observations en risques et en recommandations concrètes.</p>
+      <div class="kpis">
+        <div class="card kpi" data-reveal><b>2</b><span>outils OSINT maîtrisés</span></div>
+        <div class="card kpi" data-reveal><b>2</b><span>organisations analysées</span></div>
+        <div class="card kpi" data-reveal><b>0</b><span>test actif ou intrusif</span></div>
+        <div class="card kpi" data-reveal><b>1</b><span>signalement responsable</span></div>
+      </div>
+      <div class="grid3">
+        <div class="card pad" data-reveal><h3>Passif uniquement</h3><p class="small">Résolution DNS, consultation de Maltego et des données déjà indexées par Shodan. Aucune intrusion, aucune exploitation, aucun balayage.</p></div>
+        <div class="card pad" data-reveal><h3>Données protégées</h3><p class="small">Les courriels de particuliers et l'identité de nos interlocuteurs ont été masqués dans le rapport.</p></div>
+        <div class="card pad" data-reveal><h3>Prévenir plutôt que garder</h3><p class="small">Face à un serveur particulièrement exposé, nous avons averti l'organisation concernée.</p></div>
+      </div>
+    </section>
+
+    <!-- 02 OUTILS -->
+    <section id="outils">
+      <div class="sec-num">02 — MÉTHODE</div>
+      <h2 data-reveal>Deux outils, <em>deux questions complémentaires.</em></h2>
+      <p data-reveal>Shodan indexe des machines : il dit <strong>ce qui est exposé</strong>. Maltego construit un graphe : il montre <strong>ce qui est relié à quoi</strong>. Seuls, chacun a un angle mort. Combinés, ils permettent de délimiter le périmètre d'une organisation, puis de qualifier l'exposition de chaque actif.</p>
+      <div class="flow">
+        <div class="card step" data-reveal><span class="tool">ENTRÉE</span><h3>Nom de domaine</h3><p>Le point de départ public de l'organisation.</p></div>
+        <div class="card step" data-reveal><span class="tool">MALTEGO</span><h3>Périmètre</h3><p>Serveurs de noms, adresses IP, courriels, domaines liés.</p></div>
+        <div class="card step" data-reveal><span class="tool">SHODAN</span><h3>Exposition</h3><p>Ports ouverts, services, versions, hébergeur.</p></div>
+        <div class="card step" data-reveal><span class="tool">ANALYSE</span><h3>Attribution</h3><p>Prouver que chaque actif appartient bien à la cible.</p></div>
+        <div class="card step" data-reveal><span class="tool">LIVRABLE</span><h3>Risques</h3><p>Constats priorisés et recommandations.</p></div>
+      </div>
+      <p class="loop" data-reveal>↺ Un résultat Shodan (nom d'hôte, certificat) redevient une nouvelle entité dans Maltego.</p>
+      <div class="card tbl" data-reveal>
+        <table>
+          <thead><tr><th></th><th>Shodan</th><th>Maltego</th></tr></thead>
+          <tbody>
+            <tr><td class="mono small">Question</td><td>Qu'est-ce qui est exposé, et comment ?</td><td>Qu'est-ce qui est relié à quoi ?</td></tr>
+            <tr><td class="mono small">Entrée</td><td>Requête, filtre ou adresse IP</td><td>Entité (domaine, IP, courriel…)</td></tr>
+            <tr><td class="mono small">Résultat</td><td>Liste d'hôtes et fiche détaillée</td><td>Graphe d'entités et de relations</td></tr>
+            <tr><td class="mono small">Force</td><td>Visibilité technique des services</td><td>Corrélation et visualisation</td></tr>
+            <tr><td class="mono small">Angle mort</td><td>Peu de contexte organisationnel</td><td>Peu d'information sur les services</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 03 MALTEGO -->
+    <section id="maltego">
+      <div class="sec-num">03 — MALTEGO EN PRATIQUE</div>
+      <h2 data-reveal>De l'installation <em>au premier graphe.</em></h2>
+      <p data-reveal>Nous avons documenté pas à pas l'installation de Maltego Graph 4.13 (édition Community) sur Kali Linux, puis la construction d'un graphe à partir du domaine public <code>gnu.org</code>. Choix délibéré : les transformations ont été lancées une à une, et deux d'entre elles ont été écartées, le transfert de zone et la recherche de sous-domaines par dictionnaire, car elles sollicitent activement les serveurs ciblés.</p>
+
+      <div class="gallery">
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-recherche-paquet.webp" alt="Recherche du paquet Maltego dans les dépôts Kali" loading="lazy" /></div><figcaption><span>Recherche du paquet dans les dépôts Kali. Le paquet offensif maltego-teeth a été volontairement laissé de côté.</span><b>DEVOIR · FIG. 1</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-installation.webp" alt="Installation de Maltego et de Java" loading="lazy" /></div><figcaption><span>Mise à jour des dépôts, puis installation de Maltego et de ses dépendances Java.</span><b>DEVOIR · FIG. 2</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-activation-id.webp" alt="Choix du mode d'activation Maltego ID" loading="lazy" /></div><figcaption><span>Activation de l'édition gratuite avec un Maltego ID.</span><b>DEVOIR · FIG. 3</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-activation-ok.webp" alt="Activation de Maltego réussie" loading="lazy" /></div><figcaption><span>Activation réussie : l'assistant compte douze étapes.</span><b>DEVOIR · FIG. 5</b></figcaption></figure>
+        <figure class="card fig wide" data-reveal><div class="frame"><img src="img/osint/maltego-interface.webp" alt="Interface de Maltego Graph avec un graphe vide" loading="lazy" /></div><figcaption><span>Interface de Maltego : palette d'entités à gauche, graphe au centre, propriétés à droite.</span><b>DEVOIR · FIG. 6</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-data-hub.webp" alt="Maltego Data Hub" loading="lazy" /></div><figcaption><span>Le Data Hub : 64 sources disponibles, une seule installée en version gratuite.</span><b>DEVOIR · FIG. 7</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-entite-domaine.webp" alt="Entité de départ gnu.org" loading="lazy" /></div><figcaption><span>Entité de départ : le domaine gnu.org.</span><b>DEVOIR · FIG. 8</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-run-transforms.webp" alt="Menu Run Transforms" loading="lazy" /></div><figcaption><span>Choix ciblé de la transformation « To DNS Name - NS ».</span><b>DEVOIR · FIG. 9</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/maltego-resultat-ns.webp" alt="Résultat de la transformation NS" loading="lazy" /></div><figcaption><span>Trois serveurs de noms trouvés en 1,6 s, sans consommer de crédit.</span><b>DEVOIR · FIG. 10</b></figcaption></figure>
+        <figure class="card fig wide" data-reveal><div class="frame"><img src="img/osint/maltego-graphe-final.webp" alt="Graphe Maltego final de gnu.org" loading="lazy" /></div><figcaption><span>Graphe final : gnu.org, ses serveurs de noms et les adresses IPv4 et IPv6 de l'un d'eux. Chaque lien garde la trace de sa provenance.</span><b>DEVOIR · FIG. 11</b></figcaption></figure>
+      </div>
+      <div class="callout" data-reveal><p><strong>Ce que le graphe apprend :</strong> une résolution DNS redondante (bonne pratique) et un serveur joignable en IPv4 comme en IPv6, soit deux chemins d'accès à surveiller. Maltego s'arrête cependant aux adresses : il ne dit rien des services qui y répondent. C'est là que Shodan prend le relais.</p></div>
+    </section>
+
+    <!-- 04 SHODAN -->
+    <section id="shodan">
+      <div class="sec-num">04 — SHODAN EN PRATIQUE</div>
+      <h2 data-reveal>Le moteur de recherche <em>des machines exposées.</em></h2>
+      <p data-reveal>Là où Google indexe des pages, Shodan indexe des services : il balaie Internet en continu et enregistre ce que chaque machine annonce d'elle-même. Une recherche brute renvoie des millions de résultats. Tout l'art consiste à l'affiner avec des filtres pour isoler les configurations à risque.</p>
+      <div class="stat-row">
+        <div class="card stat" data-reveal><b>1,46 M</b><code>port:23</code><span>hôtes exposant Telnet, protocole qui transmet tout en clair</span></div>
+        <div class="card stat" data-reveal><b>697 k</b><code>title:"RouterOS"</code><span>pages d'administration de routeurs accessibles</span></div>
+        <div class="card stat" data-reveal><b>210 k</b><code>product:MongoDB</code><span>bases de données joignables depuis Internet</span></div>
+        <div class="card stat" data-reveal><b>1 528</b><code>"MongoDB" country:CA</code><span>après filtrage par pays : le Canada seul</span></div>
+      </div>
+      <div class="notice" data-reveal><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="M12 8v5M12 16h.01"/></svg><p>Dans les captures ci-dessous, la liste des machines a été masquée : seules la requête et les statistiques agrégées restent visibles. Publier les adresses de systèmes vulnérables reviendrait à désigner des cibles.</p></div>
+      <div class="gallery">
+        <figure class="card fig wide" data-reveal><div class="frame"><img src="img/osint/shodan-accueil.webp" alt="Page d'accueil de Shodan" loading="lazy" /></div><figcaption><span>Page d'accueil de Shodan : barre de recherche et connexion.</span><b>DEVOIR · FIG. 12</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/shodan-apache.webp" alt="Recherche apache dans Shodan" loading="lazy" /></div><figcaption><span>« apache » : plus de 16 millions d'hôtes, une recherche trop large pour être exploitable.</span><b>DEVOIR · FIG. 13</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/shodan-mongodb-canada.webp" alt="Recherche MongoDB au Canada" loading="lazy" /></div><figcaption><span>Avec un filtre pays, MongoDB au Canada : 1 528 résultats, ventilés par ville.</span><b>DEVOIR · FIG. 16</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/shodan-telnet.webp" alt="Recherche port 23 Telnet" loading="lazy" /></div><figcaption><span>Telnet (port 23) : près de 1,5 million d'hôtes exposés.</span><b>DEVOIR · FIG. 17</b></figcaption></figure>
+        <figure class="card fig" data-reveal><div class="frame"><img src="img/osint/shodan-routeros.webp" alt="Recherche RouterOS" loading="lazy" /></div><figcaption><span>Interfaces d'administration de routeurs MikroTik accessibles depuis Internet.</span><b>DEVOIR · FIG. 19</b></figcaption></figure>
+        <figure class="card fig wide" data-reveal><div class="frame"><img src="img/osint/shodan-filtre-vuln.webp" alt="Filtre vuln refusé" loading="lazy" /></div><figcaption><span>Limite du compte gratuit : le filtre « vuln: » (par CVE) est réservé aux comptes académiques et payants.</span><b>DEVOIR · FIG. 20</b></figcaption></figure>
+      </div>
+      <div class="callout" data-reveal><p><strong>Lire une fiche hôte :</strong> identité réseau (adresse, hébergeur, ASN), ports ouverts, bannières, d'où l'on déduit les logiciels et leurs versions, puis le contexte (certificat TLS, date du balayage). La question à se poser : ce service a-t-il vraiment besoin d'être joignable depuis Internet, et sa version est-elle à jour ?</p></div>
+    </section>
+
+    <!-- 05 CAS -->
+    <section id="cas">
+      <div class="sec-num">05 — ANALYSE D'EXPOSITION</div>
+      <h2 data-reveal>Deux organisations, <em>une même histoire.</em></h2>
+      <p data-reveal>Nous avons appliqué la méthode à deux organisations réelles dont l'infrastructure est visible depuis Internet. La première analyse s'appuie sur Shodan et son API gratuite InternetDB ; la seconde croise Maltego et Shodan.</p>
+      <div class="notice" data-reveal><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/></svg><p><strong>Version publique anonymisée.</strong> Les noms, domaines, adresses IP et versions logicielles des organisations étudiées ont été retirés. Ils figurent uniquement dans le rapport remis à l'enseignant.</p></div>
+      <div class="case-grid">
+        <div class="card case" data-reveal>
+          <span class="lbl">ORGANISATION A</span>
+          <h3>Opérateur d'infrastructure télécom</h3>
+          <p class="small">Un acteur dont l'infrastructure sert d'autres organisations : un incident chez lui aurait des répercussions bien au-delà de l'entreprise.</p>
+          <ul>
+            <li>Un seul serveur concentre l'hébergement Web, le DNS, la messagerie et <strong>trois interfaces d'administration</strong> (SSH, panneaux de gestion d'hébergement).</li>
+            <li>Le serveur héberge aussi le domaine d'un client : une compromission toucherait l'opérateur <strong>et</strong> ses clients.</li>
+            <li><strong>30 CVE</strong> déduites des versions annoncées, à traiter comme des pistes d'investigation et non comme des failles confirmées.</li>
+          </ul>
+        </div>
+        <div class="card case" data-reveal>
+          <span class="lbl">ORGANISATION B</span>
+          <h3>Plateforme Web de petites annonces</h3>
+          <p class="small">Un site dynamique hébergé chez un fournisseur cloud. Maltego relie une trentaine d'entités au site.</p>
+          <ul>
+            <li>Une <strong>base de données joignable depuis Internet</strong>, cible directe pour le vol des données des annonceurs.</li>
+            <li>Un serveur Web dans une <strong>version qui n'est plus maintenue</strong>, et un accès SSH ouvert à tous.</li>
+            <li><strong>Dix courriels personnels</strong> d'annonceurs publiés en clair, exploitables par des robots d'hameçonnage.</li>
+            <li>Une forte dépendance à des scripts tiers, dont <strong>un CDN abandonné</strong> par son auteur.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top:44px" data-reveal>Le cœur du métier : prouver l'attribution</h3>
+      <p data-reveal>Une adresse IP n'appartient pas forcément à l'organisation dont le site y est hébergé : le serveur de l'organisation B est loué chez un fournisseur cloud. Avant de parler de risque, il faut donc démontrer le rattachement. Nous l'avons fait avec <strong>trois indices concordants</strong> :</p>
+      <div class="grid3">
+        <div class="card pad" data-reveal><span class="sec-num">INDICE 1</span><h3 style="margin-top:8px">DNS</h3><p class="small">Le nom du site se résout vers l'adresse étudiée.</p></div>
+        <div class="card pad" data-reveal><span class="sec-num">INDICE 2</span><h3 style="margin-top:8px">Contenu</h3><p class="small">Le titre de page vu par Shodan est identique à celui extrait par Maltego.</p></div>
+        <div class="card pad" data-reveal><span class="sec-num">INDICE 3</span><h3 style="margin-top:8px">Architecture</h3><p class="small">Les services exposés (proxy inverse, base de données) correspondent à un site dynamique, pas à un hébergement mutualisé générique.</p></div>
+      </div>
+      <p class="small" style="margin-top:14px" data-reveal>À l'inverse, la plupart des domaines liés (Google, Meta, CDN) sont des services tiers : ils élargissent la surface de dépendance du site sans faire partie de son périmètre.</p>
+
+      <div class="card tbl" data-reveal>
+        <table>
+          <thead><tr><th>Constat</th><th>Org.</th><th>Risque potentiel</th><th>Niveau</th></tr></thead>
+          <tbody>
+            <tr><td>Base de données exposée sur Internet</td><td class="mono">B</td><td>Recherche de mots de passe, exploitation du moteur, fuite des données</td><td><span class="sev s-crit">Élevé</span></td></tr>
+            <tr><td>Interfaces d'administration exposées</td><td class="mono">A</td><td>Prise de contrôle du serveur et des comptes hébergés</td><td><span class="sev s-crit">Élevé</span></td></tr>
+            <tr><td>Serveur Web non maintenu</td><td class="mono">B</td><td>Failles connues, dont un déni de service (à confirmer)</td><td><span class="sev s-high">Élevé (à confirmer)</span></td></tr>
+            <tr><td>SSH ouvert à tous</td><td class="mono">A · B</td><td>Force brute, failles connues selon la version</td><td><span class="sev s-med">Moyen</span></td></tr>
+            <tr><td>Courriels personnels publiés</td><td class="mono">B</td><td>Collecte automatisée, hameçonnage des vendeurs</td><td><span class="sev s-med">Moyen</span></td></tr>
+            <tr><td>Scripts tiers et CDN abandonné</td><td class="mono">B</td><td>Injection de code via une dépendance compromise</td><td><span class="sev s-med">Moyen</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="margin-top:12px">Les niveaux sont estimés à partir de données passives. Une version lue dans une bannière ne prouve rien à elle seule : seule une évaluation autorisée permettrait de confirmer ces hypothèses.</p>
+    </section>
+
+    <!-- 06 DIVULGATION -->
+    <section id="divulgation">
+      <div class="sec-num">06 — DIVULGATION RESPONSABLE</div>
+      <h2 data-reveal>Découvrir un risque <em>crée une responsabilité.</em></h2>
+      <p data-reveal>Compte tenu de l'importance du serveur de l'organisation A, l'équipe a choisi de la prévenir sans attendre. Un membre de l'équipe a contacté un ingénieur de l'entreprise pour lui signaler l'adresse concernée, <strong>sans détail technique exploitable</strong>, en suggérant que le responsable de la sécurité y jette un œil. Des recommandations ont ensuite été transmises à l'administrateur, regroupées par service.</p>
+      <div class="grid3">
+        <div class="card pad" data-reveal><h3>Discrétion</h3><p class="small">Aucun détail exploitable dans le premier message : seulement l'actif concerné et une invitation à vérifier.</p></div>
+        <div class="card pad" data-reveal><h3>Bon interlocuteur</h3><p class="small">Passer par une personne technique de l'organisation, pour que l'information atteigne la sécurité informatique.</p></div>
+        <div class="card pad" data-reveal><h3>Aide concrète</h3><p class="small">Des recommandations actionnables, service par service, plutôt qu'une simple alerte.</p></div>
+      </div>
+    </section>
+
+    <!-- 07 DÉFENSE -->
+    <section id="defense">
+      <div class="sec-num">07 — RECOMMANDATIONS</div>
+      <h2 data-reveal>Réduire ce qui dépasse, <em>surveiller ce qui reste.</em></h2>
+      <div class="grid2">
+        <div class="card pad" data-reveal><h3>1. Fermer les portes d'administration</h3><p class="small">SSH et panneaux de gestion uniquement derrière un VPN ou une liste d'adresses autorisées, avec authentification par clés et MFA. Pas de connexion directe du compte root.</p></div>
+        <div class="card pad" data-reveal><h3>2. Sortir les bases de données d'Internet</h3><p class="small">Réserver le port de la base au serveur applicatif ou à un réseau privé, avec des comptes à mots de passe robustes.</p></div>
+        <div class="card pad" data-reveal><h3>3. Mettre à jour et masquer</h3><p class="small">Passer sur des versions maintenues, puis vérifier la nouvelle bannière dans Shodan. Masquer les numéros de version (<code>server_tokens off</code>).</p></div>
+        <div class="card pad" data-reveal><h3>4. Trier les CVE avec méthode</h3><p class="small">Vérifier les versions réellement installées et les correctifs déjà rétroportés, puis traiter d'abord les failles confirmées à risque élevé.</p></div>
+        <div class="card pad" data-reveal><h3>5. Assainir la chaîne d'approvisionnement Web</h3><p class="small">Remplacer les CDN abandonnés, tout charger en HTTPS, ajouter l'intégrité SRI aux scripts tiers, renforcer les en-têtes (CSP, HSTS).</p></div>
+        <div class="card pad" data-reveal><h3>6. Protéger les utilisateurs</h3><p class="small">Remplacer les courriels publiés par un formulaire ou des adresses relais protégés contre les robots, et vérifier que le stockage cloud n'est pas listable publiquement.</p></div>
+      </div>
+      <div class="callout" data-reveal><p><strong>La meilleure défense :</strong> regarder régulièrement son infrastructure comme Shodan la voit, par exemple avec une surveillance de ses plages d'adresses, et réduire tout ce qui est exposé sans nécessité.</p></div>
+    </section>
+
+    <!-- 08 BILAN -->
+    <section id="bilan">
+      <div class="sec-num">08 — BILAN</div>
+      <h2 data-reveal>Ce que ce projet <em>démontre.</em></h2>
+      <div class="grid2">
+        <div class="card pad" data-reveal><h3>Compétences mobilisées</h3><ul class="small" style="padding-left:18px;margin-top:8px"><li>Reconnaissance OSINT passive avec Maltego et Shodan</li><li>Attribution d'actifs par croisement de sources</li><li>Qualification du risque à partir de données incomplètes</li><li>Rédaction de tutoriels et de recommandations</li><li>Travail en équipe de cinq analystes</li></ul></div>
+        <div class="card pad" data-reveal><h3>Posture professionnelle</h3><ul class="small" style="padding-left:18px;margin-top:8px"><li>Cadre éthique défini avant de commencer</li><li>Refus des transformations intrusives</li><li>Protection des données personnelles</li><li>Divulgation responsable d'un risque réel</li><li>Prudence dans les conclusions : hypothèses et non certitudes</li></ul></div>
+      </div>
+      <div class="callout" data-reveal><p><strong>Limites assumées :</strong> données passives datées du dernier balayage, outils en version gratuite (filtre « vuln: » indisponible, quotas Maltego). Les vulnérabilités citées restent des hypothèses que seule une évaluation autorisée permettrait de confirmer.</p></div>
+      <div class="cta-row" data-reveal>
+        <a class="btn btn-primary" href="../#contact">Discutons de votre surface d'exposition <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <a class="btn" href="audit-saas.html">Étude de cas : audit SaaS</a>
+      </div>
+    </section>
+  </article>
+</div>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Figure agrandie"><figure><img alt="" /><p></p></figure></div>
+<footer><div class="wrap"><span>© <span id="y"></span> Hippolyte Njotong Tchapda — Projet d'équipe, cours CYB6033 (UQO).</span><a href="../">hippolyte2023.github.io</a></div></footer>
+
+<script src="../i18n/i18n.js"></script>
+<script src="../i18n/osint.js"></script>
+<script>I18N.init(I18N_OSINT.dict, I18N_OSINT.meta);</script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  /* Thème partagé avec le portfolio */
+  try { const t = localStorage.getItem("hnt-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  $("#themeBtn").onclick = () => { const n = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = n; try { localStorage.setItem("hnt-theme", n); } catch {} };
+
+  /* Révélation au scroll */
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .12 });
+  $$("[data-reveal]").forEach(el => io.observe(el));
+
+  /* Sommaire actif + barre de progression */
+  const links = $$(".toc a");
+  const so = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle("active", a.hash === "#" + e.target.id)); }), { rootMargin: "-40% 0px -55% 0px" });
+  $$("article section[id]").forEach(s => so.observe(s));
+  const bar = $("#progress");
+  addEventListener("scroll", () => { const m = document.documentElement.scrollHeight - innerHeight; bar.style.transform = `scaleX(${m > 0 ? scrollY / m : 0})`; }, { passive: true });
+
+  /* Halo lumineux sur les cartes */
+  $$(".card").forEach(c => c.addEventListener("pointermove", e => { const b = c.getBoundingClientRect(); c.style.setProperty("--mx", e.clientX - b.left + "px"); c.style.setProperty("--my", e.clientY - b.top + "px"); }));
+
+  /* Visionneuse d'images */
+  const lbx = $("#lightbox"), lbImg = lbx.querySelector("img"), lbCap = lbx.querySelector("p");
+  $$(".fig").forEach(f => f.addEventListener("click", () => { const i = f.querySelector("img"); lbImg.src = i.src; lbImg.alt = i.alt; lbCap.textContent = f.querySelector("figcaption span").textContent; lbx.classList.add("open"); }));
+  lbx.addEventListener("click", () => lbx.classList.remove("open"));
+  addEventListener("keydown", e => { if (e.key === "Escape") lbx.classList.remove("open"); });
+
+  const setYear = () => { const y = $("#y"); if (y) y.textContent = new Date().getFullYear(); };
+  setYear(); document.addEventListener("langchange", setYear);
+})();
+</script>
+</body>
+</html>

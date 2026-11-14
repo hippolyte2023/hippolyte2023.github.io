@@ -89,6 +89,17 @@ window.I18N_HOME = {
     "IA": "AI",
     "Risque": "Risk",
 
+    /* Projet OSINT */
+    "02 — Threat Intelligence · OSINT": "02 — Threat Intelligence · OSINT",
+    "Cartographier une surface d'exposition avec Maltego et Shodan": "Mapping an attack surface with Maltego and Shodan",
+    "Reconnaissance OSINT strictement passive, analyse de l'exposition de deux organisations réelles, attribution des actifs et divulgation responsable — réalisé en équipe de cinq.":
+      "Strictly passive OSINT reconnaissance, exposure analysis of two real organizations, asset attribution and responsible disclosure — delivered as a team of five.",
+    "Divulgation responsable": "Responsible disclosure",
+    "Projet d'équipe — Renseignement OSINT": "Team project — OSINT intelligence",
+    "Cours CYB6033 · UQO · Équipe de 5": "CYB6033 course · UQO · Team of 5",
+    'Exploration de Maltego et Shodan, puis <a href="projets/osint-maltego-shodan.html" style="text-decoration:underline;text-underline-offset:3px">analyse de l\'exposition publique de deux organisations</a>, menée de façon passive et conclue par une divulgation responsable.':
+      'Exploring Maltego and Shodan, then an <a href="projets/osint-maltego-shodan.html" style="text-decoration:underline;text-underline-offset:3px">analysis of two organizations\' public exposure</a>, carried out passively and wrapped up with responsible disclosure.',
+
     /* Parcours */
     "04 — Parcours": "04 — Journey",
     "Le chemin <em>jusqu'ici.</em>": "The road <em>so far.</em>",
